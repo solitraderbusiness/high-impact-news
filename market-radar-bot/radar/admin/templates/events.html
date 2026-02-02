@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Events - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Recent Events</h1>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Source</th>
+                <th>Published</th>
+                <th>Fetched</th>
+                <th>Processed</th>
+                <th>Detections</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+            <tr>
+                <td>
+                    <a href="{{ event.url }}" target="_blank" class="truncate" style="max-width: 400px; display: block;">
+                        {{ event.title }}
+                    </a>
+                    {% if event.excerpt %}
+                    <div class="text-sm text-muted truncate" style="max-width: 400px;">
+                        {{ event.excerpt[:100] }}{% if event.excerpt|length > 100 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {% if event.source %}
+                        {{ event.source.name }}
+                    {% else %}
+                        <span class="text-muted">Unknown</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {% if event.published_at %}
+                        {{ event.published_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {{ event.fetched_at.strftime('%Y-%m-%d %H:%M') }}
+                </td>
+                <td>
+                    {% if event.is_processed %}
+                        <span class="badge badge-success">Yes</span>
+                    {% else %}
+                        <span class="badge badge-warning">Pending</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {% if event.detections %}
+                        {{ event.detections|length }}
+                    {% else %}
+                        <span class="text-muted">0</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    No events collected yet. Run the collector to fetch events.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="text-sm text-muted">
+    Showing last 100 events. Events are collected from active sources and matched against watch items.
+</div>
+{% endblock %}

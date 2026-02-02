@@ -1,0 +1,71 @@
+# Market Radar Bot - Docker Compose Configuration
+#
+# Services:
+#   - web: FastAPI admin panel and API
+#   - radar: Background monitoring service
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f radar  # Watch radar logs
+#   docker compose exec web radar seed  # Seed the database
+
+version: '3.8'
+
+services:
+  # Web server for admin panel
+  web:
+    build: .
+    container_name: market-radar-web
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - radar-data:/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////data/market_radar.db
+      - HOST=0.0.0.0
+      - PORT=8000
+    command: ["python", "-m", "radar.cli", "serve"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Background monitoring service
+  radar:
+    build: .
+    container_name: market-radar-monitor
+    volumes:
+      - radar-data:/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////data/market_radar.db
+    command: ["python", "-m", "radar.cli", "run"]
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # One-time setup container (run manually)
+  # docker compose run --rm setup
+  setup:
+    build: .
+    container_name: market-radar-setup
+    volumes:
+      - radar-data:/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////data/market_radar.db
+    command: ["python", "-m", "radar.cli", "seed"]
+    profiles:
+      - setup
+
+volumes:
+  radar-data:
+    name: market-radar-data

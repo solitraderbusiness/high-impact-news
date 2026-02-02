@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}New{% else %}Edit{% endif %} Watch Item - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>{% if is_new %}New Watch Item{% else %}Edit: {{ item.name }}{% endif %}</h1>
+    <a href="/admin/watch-items" class="btn btn-secondary">Back to List</a>
+</div>
+
+<div class="card">
+    <form method="POST" action="{% if is_new %}/admin/watch-items/new{% else %}/admin/watch-items/{{ item.id }}{% endif %}">
+        <div class="form-group">
+            <label for="name">Name *</label>
+            <input type="text" id="name" name="name" required
+                   value="{{ item.name if item else '' }}"
+                   placeholder="e.g., Federal Reserve, Donald Trump, FOMC Meeting">
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category *</label>
+            <select id="category" name="category" required>
+                {% for cat in categories %}
+                <option value="{{ cat.value }}"
+                        {% if item and item.category == cat %}selected{% endif %}>
+                    {{ cat.value|replace('_', ' ')|title }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description"
+                      placeholder="Brief description of what this watch item represents">{{ item.description if item and item.description else '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="keywords">Keywords</label>
+            <textarea id="keywords" name="keywords"
+                      placeholder="Comma-separated keywords, e.g.: federal reserve, fed, powell, interest rate">{% if item and item.keywords %}{{ item.keywords|join(', ') }}{% endif %}</textarea>
+            <div class="help-text">Enter comma-separated keywords to match in articles</div>
+        </div>
+
+        <div class="form-group">
+            <label for="entities">Entities</label>
+            <textarea id="entities" name="entities"
+                      placeholder="Comma-separated entity names/aliases, e.g.: Jerome Powell, Jay Powell, Fed Chair">{% if item and item.entities %}{{ item.entities|join(', ') }}{% endif %}</textarea>
+            <div class="help-text">Enter specific names/aliases that must appear as whole words</div>
+        </div>
+
+        <div class="form-group">
+            <label for="severity_rules">Severity Rules (JSON)</label>
+            <textarea id="severity_rules" name="severity_rules"
+                      placeholder='[{"pattern": "rate hike", "score_bump": 15}]'>{% if item and item.severity_rules %}{{ item.severity_rules|tojson }}{% else %}[]{% endif %}</textarea>
+            <div class="help-text">JSON array of rules with "pattern" and "score_bump" fields</div>
+        </div>
+
+        <div class="form-group">
+            <label for="assets_affected">Assets Affected</label>
+            <input type="text" id="assets_affected" name="assets_affected"
+                   value="{% if item and item.assets_affected %}{{ item.assets_affected|join(', ') }}{% endif %}"
+                   placeholder="e.g.: USD, S&P 500, Gold, Treasury Bonds">
+            <div class="help-text">Comma-separated list of potentially affected assets</div>
+        </div>
+
+        <div class="form-group">
+            <label for="cooldown_minutes">Cooldown (minutes)</label>
+            <input type="number" id="cooldown_minutes" name="cooldown_minutes" min="1"
+                   value="{{ item.cooldown_minutes if item else 15 }}">
+            <div class="help-text">Minimum time between alerts for this item (bypassed for severity >= 90)</div>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="is_active" value="true"
+                       {% if not item or item.is_active %}checked{% endif %}>
+                Active
+            </label>
+            <div class="help-text">Only active watch items are matched against incoming events</div>
+        </div>
+
+        <div class="form-group">
+            <label>Linked Sources</label>
+            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem;">
+                {% for source in sources %}
+                <label class="checkbox-label" style="margin-bottom: 0.25rem;">
+                    <input type="checkbox" name="source_id" value="{{ source.id }}"
+                           {% if item_source_ids is defined and source.id in item_source_ids %}checked{% endif %}>
+                    {{ source.name }} <span class="text-muted">({{ source.source_type.value }})</span>
+                </label>
+                {% else %}
+                <div class="text-muted">No sources available. <a href="/admin/sources/new">Create one</a></div>
+                {% endfor %}
+            </div>
+            <div class="help-text">Select sources specifically tied to this watch item. Global sources will also be scanned.</div>
+            <input type="hidden" id="source_ids" name="source_ids" value="">
+        </div>
+
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">
+                {% if is_new %}Create Watch Item{% else %}Save Changes{% endif %}
+            </button>
+            <a href="/admin/watch-items" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Collect checked source IDs before form submission
+document.querySelector('form').addEventListener('submit', function(e) {
+    const checked = document.querySelectorAll('input[name="source_id"]:checked');
+    const ids = Array.from(checked).map(cb => cb.value).join(',');
+    document.getElementById('source_ids').value = ids;
+});
+</script>
+{% endblock %}

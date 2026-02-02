@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Sources - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Sources</h1>
+    <a href="/admin/sources/new" class="btn btn-primary">+ Add Source</a>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Type</th>
+                <th>Tier</th>
+                <th>Global</th>
+                <th>Last Fetched</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for source in sources %}
+            <tr>
+                <td>
+                    <a href="/admin/sources/{{ source.id }}">
+                        <strong>{{ source.name }}</strong>
+                    </a>
+                </td>
+                <td class="truncate text-sm">
+                    <a href="{{ source.url }}" target="_blank" class="text-muted">{{ source.url }}</a>
+                </td>
+                <td>
+                    <span class="badge badge-info">{{ source.source_type.value }}</span>
+                </td>
+                <td>
+                    {% if source.tier.value == 'primary' %}
+                        <span class="badge badge-success">{{ source.tier.value }}</span>
+                    {% elif source.tier.value == 'secondary' %}
+                        <span class="badge badge-warning">{{ source.tier.value }}</span>
+                    {% else %}
+                        <span class="badge badge-gray">{{ source.tier.value }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if source.is_global %}
+                        <span class="badge badge-info">Global</span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {% if source.state and source.state.last_fetched_at %}
+                        {{ source.state.last_fetched_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if source.state.consecutive_errors > 0 %}
+                            <br><span class="text-muted" style="color: #dc2626;">{{ source.state.consecutive_errors }} errors</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">Never</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if source.is_active %}
+                        <span class="badge badge-success">Active</span>
+                    {% else %}
+                        <span class="badge badge-gray">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex gap-2">
+                        <a href="/admin/sources/{{ source.id }}" class="btn btn-secondary btn-sm">Edit</a>
+                        <form method="POST" action="/admin/sources/{{ source.id }}/delete"
+                              onsubmit="return confirm('Delete this source?');" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-muted">
+                    No sources yet. <a href="/admin/sources/new">Create one</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

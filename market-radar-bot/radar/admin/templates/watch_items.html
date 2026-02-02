@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Watch Items - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Watch Items</h1>
+    <a href="/admin/watch-items/new" class="btn btn-primary">+ Add Watch Item</a>
+</div>
+
+{% if stats %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.watch_items_count }}</div>
+        <div class="stat-label">Active Watch Items</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.sources_count }}</div>
+        <div class="stat-label">Active Sources</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.events_count }}</div>
+        <div class="stat-label">Total Events</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.detections_count }}</div>
+        <div class="stat-label">Detections</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.alerts_count }}</div>
+        <div class="stat-label">Alerts Sent</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Keywords</th>
+                <th>Entities</th>
+                <th>Cooldown</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>
+                    <a href="/admin/watch-items/{{ item.id }}">
+                        <strong>{{ item.name }}</strong>
+                    </a>
+                    {% if item.description %}
+                    <div class="text-sm text-muted truncate">{{ item.description }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-info">{{ item.category.value }}</span>
+                </td>
+                <td class="text-sm">
+                    {% if item.keywords %}
+                        {{ item.keywords|length }} keywords
+                    {% else %}
+                        <span class="text-muted">None</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {% if item.entities %}
+                        {{ item.entities|length }} entities
+                    {% else %}
+                        <span class="text-muted">None</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">{{ item.cooldown_minutes }} min</td>
+                <td>
+                    {% if item.is_active %}
+                        <span class="badge badge-success">Active</span>
+                    {% else %}
+                        <span class="badge badge-gray">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex gap-2">
+                        <a href="/admin/watch-items/{{ item.id }}" class="btn btn-secondary btn-sm">Edit</a>
+                        <form method="POST" action="/admin/watch-items/{{ item.id }}/delete"
+                              onsubmit="return confirm('Delete this watch item?');" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center text-muted">
+                    No watch items yet. <a href="/admin/watch-items/new">Create one</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

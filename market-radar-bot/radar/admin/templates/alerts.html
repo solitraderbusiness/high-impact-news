@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Sent Alerts</h1>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>Watch Item</th>
+                <th>Severity</th>
+                <th>Sent At</th>
+                <th>Status</th>
+                <th>Retries</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert in alerts %}
+            <tr>
+                <td>
+                    {% if alert.detection and alert.detection.event %}
+                    <a href="{{ alert.detection.event.url }}" target="_blank" class="truncate" style="max-width: 300px; display: block;">
+                        {{ alert.detection.event.title }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted">Event deleted</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if alert.detection and alert.detection.watch_item %}
+                        <span class="badge badge-info">{{ alert.detection.watch_item.name }}</span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if alert.detection %}
+                        {% if alert.detection.severity_score >= 90 %}
+                            <span class="badge badge-danger">{{ alert.detection.severity_score }}</span>
+                        {% elif alert.detection.severity_score >= 70 %}
+                            <span class="badge badge-warning">{{ alert.detection.severity_score }}</span>
+                        {% else %}
+                            <span class="badge badge-info">{{ alert.detection.severity_score }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {{ alert.sent_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                </td>
+                <td>
+                    {% if alert.is_success %}
+                        <span class="badge badge-success">Sent</span>
+                    {% else %}
+                        <span class="badge badge-danger">Failed</span>
+                        {% if alert.error_message %}
+                        <div class="text-sm text-muted" style="color: #dc2626;">
+                            {{ alert.error_message[:50] }}{% if alert.error_message|length > 50 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td class="text-sm">
+                    {{ alert.retry_count }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    No alerts sent yet. Alerts are sent when high-severity events are detected.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="text-sm text-muted">
+    Showing last 100 alerts. Alerts are sent via Telegram when events match watch items with severity >= {{ settings.alert_threshold }}.
+</div>
+{% endblock %}

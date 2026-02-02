@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Settings</h1>
+</div>
+
+{% if message %}
+<div class="alert {% if 'success' in message.lower() or 'sent' in message.lower() %}alert-success{% else %}alert-warning{% endif %}">
+    {{ message }}
+</div>
+{% endif %}
+
+<div class="stats-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.watch_items_count }}</div>
+        <div class="stat-label">Watch Items</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.sources_count }}</div>
+        <div class="stat-label">Sources</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.events_count }}</div>
+        <div class="stat-label">Events</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.detections_count }}</div>
+        <div class="stat-label">Detections</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.alerts_count }}</div>
+        <div class="stat-label">Alerts</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Current Configuration</h2>
+    <p class="text-sm text-muted mb-4">
+        These settings are configured via environment variables. Update your .env file to change them.
+    </p>
+
+    <table>
+        <tbody>
+            <tr>
+                <td><strong>Alert Threshold</strong></td>
+                <td>{{ current_settings.alert_threshold }}</td>
+                <td class="text-sm text-muted">Severity score (0-100) above which immediate alerts are sent</td>
+            </tr>
+            <tr>
+                <td><strong>Digest Threshold</strong></td>
+                <td>{{ current_settings.digest_threshold }}</td>
+                <td class="text-sm text-muted">Severity score for digest inclusion</td>
+            </tr>
+            <tr>
+                <td><strong>Poll Interval</strong></td>
+                <td>{{ current_settings.poll_interval_seconds }} seconds</td>
+                <td class="text-sm text-muted">How often sources are polled</td>
+            </tr>
+            <tr>
+                <td><strong>Default Cooldown</strong></td>
+                <td>{{ current_settings.default_cooldown_minutes }} minutes</td>
+                <td class="text-sm text-muted">Time between alerts for same watch item</td>
+            </tr>
+            <tr>
+                <td><strong>LLM Confidence Threshold</strong></td>
+                <td>{{ current_settings.llm_confidence_threshold }}</td>
+                <td class="text-sm text-muted">Minimum confidence for LLM matches</td>
+            </tr>
+            <tr>
+                <td><strong>Max Text Length</strong></td>
+                <td>{{ current_settings.max_text_length }} chars</td>
+                <td class="text-sm text-muted">Maximum stored text per event</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Integration Status</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td><strong>Telegram</strong></td>
+                <td>
+                    {% if current_settings.has_telegram %}
+                        <span class="badge badge-success">Configured</span>
+                    {% else %}
+                        <span class="badge badge-warning">Not Configured</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if current_settings.has_telegram %}
+                        <form method="POST" action="/admin/settings/test-telegram" style="display: inline;">
+                            <button type="submit" class="btn btn-secondary btn-sm">Send Test Message</button>
+                        </form>
+                    {% else %}
+                        <span class="text-sm text-muted">Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td><strong>OpenRouter LLM</strong></td>
+                <td>
+                    {% if current_settings.has_openrouter %}
+                        <span class="badge badge-success">Configured</span>
+                    {% else %}
+                        <span class="badge badge-gray">Not Configured (Rules Only)</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm text-muted">
+                    {% if current_settings.has_openrouter %}
+                        Model: {{ current_settings.openrouter_model }}
+                    {% else %}
+                        Set OPENROUTER_API_KEY to enable LLM fallback
+                    {% endif %}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Environment Variables Reference</h2>
+    <div class="text-sm" style="font-family: monospace; background: #f3f4f6; padding: 1rem; border-radius: 0.375rem; overflow-x: auto;">
+        <pre style="margin: 0;">
+# Database
+DATABASE_URL=sqlite:///./market_radar.db
+
+# Admin
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=changeme
+SECRET_KEY=your-secret-key
+
+# Telegram
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHAT_ID=your-chat-id
+
+# OpenRouter (optional)
+OPENROUTER_API_KEY=your-api-key
+OPENROUTER_MODEL=anthropic/claude-3-haiku
+
+# Thresholds
+ALERT_THRESHOLD=70
+DIGEST_THRESHOLD=30
+POLL_INTERVAL_SECONDS=60
+DEFAULT_COOLDOWN_MINUTES=15
+        </pre>
+    </div>
+</div>
+
+{% endblock %}
