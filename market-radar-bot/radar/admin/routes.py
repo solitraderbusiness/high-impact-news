@@ -21,6 +21,12 @@ from radar.config import get_settings
 from radar.models import WatchItemCategory, SourceType, SourceTier
 from radar.schemas import WatchItemCreate, WatchItemUpdate, SourceCreate, SourceUpdate
 from radar.notify.telegram import TelegramNotifier
+from radar.learning import (
+    ImpactTracker,
+    ReliabilityScorer,
+    HistoryRecorder,
+    SourceDiscovery,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -542,3 +548,191 @@ async def admin_index(request: Request):
         return RedirectResponse(url="/admin/login", status_code=302)
 
     return RedirectResponse(url="/admin/watch-items", status_code=302)
+
+
+# =============================================================================
+# Learning System
+# =============================================================================
+
+@router.get("/learning", response_class=HTMLResponse)
+async def learning_dashboard(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Learning system dashboard."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    reliability_scorer = ReliabilityScorer()
+    history_recorder = HistoryRecorder()
+    source_discovery = SourceDiscovery()
+
+    # Get source reliability rankings
+    rankings = reliability_scorer.get_all_source_rankings(db)
+
+    # Get recent history
+    recent_history = history_recorder.get_recent_history(db, limit=20)
+
+    # Get source candidates ready for review
+    candidates = source_discovery.get_candidates_for_review(db)
+
+    return templates.TemplateResponse(
+        "learning.html",
+        get_context(
+            request,
+            rankings=rankings,
+            recent_history=recent_history,
+            candidates=candidates,
+        )
+    )
+
+
+@router.get("/learning/source/{source_id}", response_class=HTMLResponse)
+async def source_reliability_detail(
+    request: Request,
+    source_id: int,
+    db: Session = Depends(get_db),
+):
+    """Detailed reliability stats for a source."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    reliability_scorer = ReliabilityScorer()
+
+    stats = reliability_scorer.get_source_stats(db, source_id)
+    best_hours = reliability_scorer.get_best_hours_for_source(db, source_id)
+    should_demote, demote_reason = reliability_scorer.should_demote_source(db, source_id)
+
+    source = storage.get_source(db, source_id)
+
+    return templates.TemplateResponse(
+        "source_reliability.html",
+        get_context(
+            request,
+            source=source,
+            stats=stats,
+            best_hours=best_hours,
+            should_demote=should_demote,
+            demote_reason=demote_reason,
+        )
+    )
+
+
+@router.get("/learning/history/{watch_item_id}", response_class=HTMLResponse)
+async def watch_item_history(
+    request: Request,
+    watch_item_id: int,
+    db: Session = Depends(get_db),
+):
+    """Historical analysis for a watch item."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    history_recorder = HistoryRecorder()
+
+    stats = history_recorder.get_watch_item_stats(db, watch_item_id)
+    correlation = history_recorder.get_correlation_analysis(db, watch_item_id)
+    training_data = history_recorder.get_training_data(db, watch_item_id=watch_item_id)
+
+    watch_item = storage.get_watch_item(db, watch_item_id)
+
+    return templates.TemplateResponse(
+        "watch_item_history.html",
+        get_context(
+            request,
+            watch_item=watch_item,
+            stats=stats,
+            correlation=correlation,
+            training_data=training_data[:50],  # Limit for display
+        )
+    )
+
+
+@router.post("/learning/discover")
+async def trigger_source_discovery(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Trigger automatic source discovery."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    source_discovery = SourceDiscovery()
+    added = source_discovery.auto_discover(db)
+
+    return RedirectResponse(
+        url=f"/admin/learning?message=Discovered+{added}+new+candidate+sources",
+        status_code=302
+    )
+
+
+@router.post("/learning/validate-candidates")
+async def validate_all_candidates(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Validate all pending source candidates."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    source_discovery = SourceDiscovery()
+    results = source_discovery.validate_all_candidates(db)
+
+    message = f"Validated:{results['validated']}+Invalid:{results['invalid']}"
+
+    return RedirectResponse(
+        url=f"/admin/learning?message={message}",
+        status_code=302
+    )
+
+
+@router.post("/learning/promote/{candidate_id}")
+async def promote_candidate(
+    request: Request,
+    candidate_id: int,
+    name: str = Form(...),
+    tier: int = Form(3),
+    db: Session = Depends(get_db),
+):
+    """Promote a validated candidate to active source."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    source_discovery = SourceDiscovery()
+    source = source_discovery.promote_to_active(db, candidate_id, name, tier)
+
+    if source:
+        message = f"Promoted+to+source+{source.id}"
+    else:
+        message = "Failed+to+promote"
+
+    return RedirectResponse(
+        url=f"/admin/learning?message={message}",
+        status_code=302
+    )
+
+
+@router.get("/learning/export", response_class=HTMLResponse)
+async def export_training_data(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Export training data as JSON."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    history_recorder = HistoryRecorder()
+    data = history_recorder.get_training_data(db, only_with_impact=True)
+
+    return Response(
+        content=json.dumps(data, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=training_data.json"}
+    )

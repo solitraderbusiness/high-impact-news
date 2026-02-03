@@ -159,6 +159,14 @@ market-radar-bot/
 │   │   ├── scheduler.py            # APScheduler wrapper
 │   │   └── pipeline.py             # End-to-end orchestration
 │   │
+│   ├── learning/                   # Learning system
+│   │   ├── __init__.py
+│   │   ├── impact_tracker.py       # Market impact measurement
+│   │   ├── reliability_scorer.py   # Source reliability scoring
+│   │   ├── history_recorder.py     # ML training data storage
+│   │   ├── source_discovery.py     # Auto source discovery
+│   │   └── price_fetcher.py        # Yahoo/Alpha Vantage prices
+│   │
 │   └── admin/                      # Admin panel
 │       ├── __init__.py
 │       ├── routes.py               # FastAPI routes for admin
@@ -171,7 +179,10 @@ market-radar-bot/
 │       │   ├── source_edit.html    # Source form
 │       │   ├── events.html         # Events log
 │       │   ├── alerts.html         # Alerts log
-│       │   └── settings.html       # Settings view
+│       │   ├── settings.html       # Settings view
+│       │   ├── learning.html       # Learning dashboard
+│       │   ├── source_reliability.html  # Source reliability detail
+│       │   └── watch_item_history.html  # Watch item history
 │       └── static/
 │           └── styles.css          # Additional CSS
 │
@@ -712,6 +723,211 @@ print(f'Got {len(items)} items')
 
 ---
 
+## Learning System
+
+The Market Radar Bot includes a learning system that tracks actual market impact after alerts and adjusts source reliability scores over time.
+
+### Learning Components
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          LEARNING SYSTEM                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Alert Sent ──► Create Impact Records ──► Measure Price Changes              │
+│                      │                           │                            │
+│                      ▼                           ▼                            │
+│              ┌───────────────┐          ┌───────────────┐                    │
+│              │ Market Impact │          │ Price Fetcher │                    │
+│              │   Tracker     │◄────────│ (Yahoo/Alpha) │                    │
+│              └───────┬───────┘          └───────────────┘                    │
+│                      │                                                        │
+│                      ▼                                                        │
+│              ┌───────────────┐                                               │
+│              │  Reliability  │──► Tier Adjustment ──► Severity Scoring       │
+│              │    Scorer     │                                               │
+│              └───────┬───────┘                                               │
+│                      │                                                        │
+│                      ▼                                                        │
+│              ┌───────────────┐                                               │
+│              │   History     │──► Export Training Data ──► ML Models         │
+│              │   Recorder    │                                               │
+│              └───────────────┘                                               │
+│                                                                              │
+│              ┌───────────────┐                                               │
+│              │    Source     │──► Discover ──► Validate ──► Promote          │
+│              │   Discovery   │                                               │
+│              └───────────────┘                                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Impact Tracker (`radar/learning/impact_tracker.py`)
+
+Measures actual price movements after alerts at intervals: 5min, 15min, 1hr, 4hr, 24hr.
+
+```python
+class ImpactTracker:
+    def create_impact_records(self, db, detection) -> List[MarketImpact]:
+        """Create MarketImpact records for each affected asset."""
+
+    def measure_pending_impacts(self, db) -> int:
+        """Measure price changes for pending impacts."""
+
+    def _calculate_impact_score(self, impact) -> int:
+        """Calculate actual impact score (0-100) based on price movements."""
+
+    def _was_prediction_accurate(self, predicted_severity, actual_impact) -> bool:
+        """
+        Rules:
+        - High severity (>=70) should have high impact (>=50)
+        - Medium severity (50-69) should have medium+ impact (>=30)
+        - Low severity (<50) with high impact is not penalized
+        """
+```
+
+**Impact Thresholds by Asset Type:**
+| Type | 5min | 15min | 1hr | 4hr | 24hr |
+|------|------|-------|-----|-----|------|
+| Forex | 0.05% | 0.10% | 0.20% | 0.40% | 0.80% |
+| Index | 0.10% | 0.25% | 0.50% | 1.00% | 2.00% |
+| Commodity | 0.15% | 0.30% | 0.60% | 1.20% | 2.50% |
+| Crypto | 0.50% | 1.00% | 2.00% | 4.00% | 8.00% |
+
+### 2. Reliability Scorer (`radar/learning/reliability_scorer.py`)
+
+Tracks source reliability based on prediction accuracy and adjusts severity scoring.
+
+```python
+class ReliabilityScorer:
+    def update_from_impact(self, db, impact) -> SourceReliability:
+        """Update source reliability based on measured impact."""
+
+    def get_tier_adjustment(self, db, source_id) -> int:
+        """Get tier adjustment (-20 to +20) for a source."""
+
+    def get_adjusted_severity(self, db, source_id, base_severity) -> int:
+        """Apply reliability adjustment to severity score."""
+
+    def should_demote_source(self, db, source_id) -> Tuple[bool, str]:
+        """Check if source should be demoted due to poor performance."""
+```
+
+**Reliability Score Calculation:**
+- Accuracy rate: 60% weight
+- Inverse false positive rate: 40% weight
+- Tier adjustment: (reliability_score - 0.5) × 40, clamped to [-20, +20]
+- Requires minimum 10 alerts before adjustment is applied
+
+### 3. History Recorder (`radar/learning/history_recorder.py`)
+
+Records structured data for ML training on price prediction.
+
+```python
+class HistoryRecorder:
+    def record_detection(self, db, detection) -> WatchItemHistory:
+        """Record detection with timestamp, severity, trigger quotes."""
+
+    def update_with_impact(self, db, detection_id) -> WatchItemHistory:
+        """Update history with actual market impact data."""
+
+    def get_training_data(self, db, ...) -> List[Dict]:
+        """Get historical data formatted for ML training."""
+
+    def export_training_data(self, db, filepath) -> int:
+        """Export training data to JSON file."""
+
+    def get_correlation_analysis(self, db, watch_item_id) -> Dict:
+        """Analyze correlation between severity and actual impact."""
+```
+
+**Training Data Fields:**
+- `watch_item`, `event_title`, `event_excerpt`
+- `severity_score`, `match_confidence`, `trigger_quotes`
+- `day_of_week`, `hour_of_day`, `is_market_hours`, `market_session`
+- `market_impacts` (per-asset changes at each interval)
+- `had_significant_impact`, `impact_direction`
+
+### 4. Source Discovery (`radar/learning/source_discovery.py`)
+
+Automatically discovers and validates new news sources.
+
+```python
+class SourceDiscovery:
+    def add_candidate(self, db, url, ...) -> SourcePool:
+        """Add a candidate source to the pool."""
+
+    def validate_candidate(self, db, candidate_id) -> Dict:
+        """Validate accessibility, content quality, relevance."""
+
+    def promote_to_active(self, db, candidate_id, name) -> Source:
+        """Promote validated candidate to active source."""
+
+    def auto_discover(self, db) -> int:
+        """Discover sources from trusted domains."""
+
+    def find_replacement_sources(self, db, failed_source) -> List[SourcePool]:
+        """Find replacements when a source fails."""
+```
+
+**Trusted Domains for Discovery:**
+- reuters.com, bloomberg.com, ft.com, wsj.com
+- cnbc.com, bbc.com, nytimes.com, economist.com
+- marketwatch.com, investing.com, forexlive.com
+- fxstreet.com, dailyfx.com, tradingview.com
+
+### Learning System Data Models
+
+```python
+class MarketImpact(Base):
+    """Tracks actual market impact after an alert."""
+    detection_id: FK
+    asset_symbol: str
+    price_at_alert: float
+    change_5min, change_15min, change_1hr, change_4hr, change_24hr: float
+    max_move_up, max_move_down: float
+    actual_impact_score: int  # 0-100
+    was_accurate: bool
+    status: ImpactStatus  # PENDING, MEASURED, NO_DATA, INSUFFICIENT
+
+class SourceReliability(Base):
+    """Tracks reliability metrics for each source."""
+    source_id: FK
+    total_alerts, high_severity_alerts: int
+    accurate_predictions, inaccurate_predictions: int
+    reliability_score: float  # 0.0-1.0
+    tier_adjustment: int  # -20 to +20
+    false_positive_rate: float
+    hourly_stats: JSON  # Performance by hour
+
+class WatchItemHistory(Base):
+    """Historical record for ML training."""
+    watch_item_id, detection_id: FK
+    event_title, event_excerpt: str
+    severity_score, match_confidence: float
+    trigger_quotes: JSON
+    market_impacts: JSON  # Per-asset impact data
+    had_significant_impact: bool
+    impact_direction: str  # up, down, mixed
+
+class SourcePool(Base):
+    """Pool of potential sources for auto-discovery."""
+    url: str
+    status: SourcePoolStatus  # CANDIDATE, VALIDATING, VALIDATED, INVALID, PROMOTED
+    validation_results: JSON
+    promoted_source_id: Optional[FK]
+```
+
+### Admin Panel - Learning Dashboard
+
+Access at `/admin/learning`:
+- **Source Reliability Rankings**: Sources ranked by prediction accuracy
+- **Recent Detection History**: Detections with impact measurements
+- **Source Candidates**: Validated sources ready for promotion
+- **Actions**: Discover sources, validate candidates, export training data
+
+---
+
 ## Future Enhancements
 
 1. **Digest Mode**: Daily/weekly summary emails
@@ -722,3 +938,5 @@ print(f'Got {len(items)} items')
 6. **Dashboard Metrics**: Grafana integration
 7. **Alert Escalation**: SMS for severity >= 95
 8. **Multi-tenant**: Support multiple users/organizations
+9. **ML Price Prediction**: Train models on historical data
+10. **Automated Source Rotation**: Replace failing sources automatically

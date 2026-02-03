@@ -306,6 +306,65 @@ For the curious:
 
 ---
 
+## The Learning System
+
+The bot gets smarter over time! Here's how:
+
+### How It Learns
+
+After sending an alert, the bot watches what actually happens to the market:
+
+```
+Alert Sent         →    5 min later    →    15 min later    →    1 hour later
+"Fed announces           Price check         Price check          Price check
+rate hike"               Did market move?    Did market move?     Did market move?
+```
+
+### Why This Matters
+
+**The Problem:**
+- Some sources exaggerate ("BREAKING: Minor comment!")
+- Some alerts sound important but markets don't care
+- You want to focus on sources that actually predict market moves
+
+**The Solution:**
+The bot tracks which sources are reliable:
+
+| Source | High Alerts | Actually Moved Market | Reliability |
+|--------|------------|----------------------|-------------|
+| Fed.gov | 15 | 14 (93%) | ★★★★★ Very High |
+| Reuters | 50 | 38 (76%) | ★★★★☆ High |
+| Random Blog | 30 | 8 (27%) | ★★☆☆☆ Low |
+
+### Automatic Adjustments
+
+Based on track record:
+- **Reliable sources**: Severity score gets boosted (+10 to +20)
+- **Unreliable sources**: Severity score gets reduced (-10 to -20)
+
+So if "Random Blog" posts about a rate hike, the severity might go from 70 to 55 (below your alert threshold), because history shows their high-severity alerts rarely move markets.
+
+### Finding New Sources
+
+The bot can also discover new sources automatically:
+1. Scans trusted domains for RSS feeds
+2. Validates they have relevant content
+3. Presents them for your approval
+4. Adds them to your monitoring
+
+### Historical Data
+
+All this data is saved for the future:
+- Every alert, what it predicted, what actually happened
+- Which assets moved and in which direction
+- Time of day, day of week patterns
+
+This data can be used to train AI models that predict price movements from news!
+
+You can access all this in the Admin Panel under "Learning".
+
+---
+
 ## Limitations
 
 1. **Only as good as sources**: If a source doesn't have an RSS feed or blocks scraping, we can't monitor it
@@ -313,11 +372,17 @@ For the curious:
 3. **No sentiment**: Doesn't know if news is "good" or "bad", just that it's relevant
 4. **English-focused**: Works best with English content
 5. **No images/videos**: Only processes text content
+6. **Learning takes time**: Need at least 10 alerts per source before reliability adjustments kick in
 
 ---
 
 ## Summary
 
-Market Radar Bot = Automated news monitoring + Smart filtering + Instant alerts
+Market Radar Bot = Automated news monitoring + Smart filtering + Instant alerts + Self-improving
 
-It's like having a team that reads every news source 24/7 and only bothers you when something you care about happens, complete with the exact quote so you know it's real.
+It's like having a team that:
+- Reads every news source 24/7
+- Only bothers you when something you care about happens
+- Includes the exact quote so you know it's real
+- Learns which sources actually matter over time
+- Gets smarter the more you use it

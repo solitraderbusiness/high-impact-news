@@ -1,5 +1,5 @@
 """
-Main pipeline orchestrating: collect -> detect -> score -> notify -> store.
+Main pipeline orchestrating: collect -> detect -> score -> notify -> store -> learn.
 """
 
 from datetime import datetime
@@ -20,6 +20,11 @@ from radar.detect.scoring import SeverityScorer
 from radar.detect.dedup import Deduplicator
 from radar.notify.telegram import TelegramNotifier, AlertData
 from radar.schemas import CollectionResult, DetectionResult, PipelineRunResult
+from radar.learning import (
+    ImpactTracker,
+    ReliabilityScorer,
+    HistoryRecorder,
+)
 
 logger = structlog.get_logger()
 
@@ -47,6 +52,11 @@ class Pipeline:
             cooldown_minutes=self.settings.default_cooldown_minutes,
         )
         self.notifier = TelegramNotifier()
+
+        # Learning system components
+        self.impact_tracker = ImpactTracker()
+        self.reliability_scorer = ReliabilityScorer()
+        self.history_recorder = HistoryRecorder()
 
     def run(self, once: bool = False) -> PipelineRunResult:
         """
@@ -83,6 +93,17 @@ class Pipeline:
                         error = f"Error processing event {event.id}: {str(e)}"
                         logger.error("event_processing_error", event_id=event.id, error=str(e))
                         errors.append(error)
+
+                # Step 5: Learning system - measure pending impacts
+                try:
+                    measured = self.impact_tracker.measure_pending_impacts(db)
+                    if measured > 0:
+                        logger.info("impacts_measured", count=measured)
+
+                        # Update reliability scores for measured impacts
+                        self.reliability_scorer.update_all_sources(db)
+                except Exception as e:
+                    logger.error("learning_system_error", error=str(e))
 
         except Exception as e:
             error = f"Pipeline error: {str(e)}"
@@ -331,6 +352,21 @@ class Pipeline:
             severity_rules=watch_item.severity_rules,
         )
 
+        # Apply reliability adjustment from learning system
+        if event.source_id:
+            reliability_adjustment = self.reliability_scorer.get_tier_adjustment(
+                db, event.source_id
+            )
+            if reliability_adjustment != 0:
+                adjusted_total = max(0, min(100, score_breakdown.total + reliability_adjustment))
+                score_breakdown.total = adjusted_total
+                logger.debug(
+                    "reliability_adjustment_applied",
+                    source_id=event.source_id,
+                    adjustment=reliability_adjustment,
+                    new_score=adjusted_total,
+                )
+
         # Get additional attributes from match
         llm_reasoning = getattr(best_match, 'llm_reasoning', None)
         assets_from_match = getattr(best_match, 'assets_affected', None)
@@ -443,5 +479,17 @@ URL: {event.url}"""
 
         if result.success:
             storage.mark_detection_alerted(db, detection.id)
+
+            # Learning system: create impact tracking records
+            try:
+                self.impact_tracker.create_impact_records(db, detection)
+            except Exception as e:
+                logger.error("impact_record_creation_error", detection_id=detection.id, error=str(e))
+
+            # Learning system: record history for ML training
+            try:
+                self.history_recorder.record_detection(db, detection)
+            except Exception as e:
+                logger.error("history_record_error", detection_id=detection.id, error=str(e))
 
         return result.success

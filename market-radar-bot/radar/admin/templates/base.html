@@ -336,6 +336,7 @@
                 <a href="/admin/sources" {% if request.url.path == '/admin/sources' %}class="active"{% endif %}>Sources</a>
                 <a href="/admin/events" {% if request.url.path == '/admin/events' %}class="active"{% endif %}>Events</a>
                 <a href="/admin/alerts" {% if request.url.path == '/admin/alerts' %}class="active"{% endif %}>Alerts</a>
+                <a href="/admin/learning" {% if '/admin/learning' in request.url.path %}class="active"{% endif %}>Learning</a>
                 <a href="/admin/settings" {% if request.url.path == '/admin/settings' %}class="active"{% endif %}>Settings</a>
                 <a href="/admin/logout">Logout</a>
             </div>

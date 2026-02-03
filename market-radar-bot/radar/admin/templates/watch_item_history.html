@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}History - {{ watch_item.name if watch_item else 'Unknown' }} - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>History: {{ watch_item.name if watch_item else 'Unknown' }}</h1>
+    <a href="/admin/learning" class="btn btn-secondary">Back to Learning</a>
+</div>
+
+{% if stats.status == 'no_data' %}
+<div class="alert alert-warning">
+    No historical data available for this watch item yet. Detections will appear here after being processed.
+</div>
+{% else %}
+
+<!-- Key Metrics -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_detections }}</div>
+        <div class="stat-label">Total Detections</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.detections_with_impact }}</div>
+        <div class="stat-label">With Impact Data</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.significant_impact_count }}</div>
+        <div class="stat-label">Significant Impacts</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.1f"|format(stats.significant_impact_rate * 100) }}%</div>
+        <div class="stat-label">Significant Rate</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.1f"|format(stats.avg_severity) }}</div>
+        <div class="stat-label">Avg. Severity</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.0f"|format(stats.market_hours_percentage * 100) }}%</div>
+        <div class="stat-label">During Market Hours</div>
+    </div>
+</div>
+
+<!-- Direction Stats -->
+<div class="card">
+    <h2>Impact Direction Distribution</h2>
+    <div class="flex gap-2 mt-2">
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 2rem; color: green;">&#9650;</div>
+            <div style="font-size: 1.5rem;">{{ stats.direction_stats.up }}</div>
+            <div class="text-sm text-muted">Up</div>
+        </div>
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 2rem; color: red;">&#9660;</div>
+            <div style="font-size: 1.5rem;">{{ stats.direction_stats.down }}</div>
+            <div class="text-sm text-muted">Down</div>
+        </div>
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 2rem; color: gray;">&#9644;</div>
+            <div style="font-size: 1.5rem;">{{ stats.direction_stats.mixed }}</div>
+            <div class="text-sm text-muted">Mixed</div>
+        </div>
+    </div>
+</div>
+
+<!-- Correlation Analysis -->
+{% if correlation and correlation.status != 'no_data' %}
+<div class="card">
+    <h2>Severity vs. Impact Correlation</h2>
+    <p class="text-sm text-muted mb-4">{{ correlation.interpretation }}</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Severity Bucket</th>
+                <th>Score Range</th>
+                <th>Total</th>
+                <th>Significant Impact</th>
+                <th>Rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bucket_name, bucket in correlation.buckets.items() %}
+            <tr>
+                <td>
+                    {% if bucket_name == 'high' %}
+                    <span class="badge badge-danger">High</span>
+                    {% elif bucket_name == 'medium' %}
+                    <span class="badge badge-warning">Medium</span>
+                    {% else %}
+                    <span class="badge badge-info">Low</span>
+                    {% endif %}
+                </td>
+                <td>{{ bucket.min }} - {{ bucket.max }}</td>
+                <td>{{ bucket.total }}</td>
+                <td>{{ bucket.significant }}</td>
+                <td>
+                    {% if bucket.significant_rate >= 0.5 %}
+                    <span style="color: green;">{{ "%.0f"|format(bucket.significant_rate * 100) }}%</span>
+                    {% else %}
+                    {{ "%.0f"|format(bucket.significant_rate * 100) }}%
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Day of Week Distribution -->
+<div class="card">
+    <h2>Distribution by Day of Week</h2>
+    {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+    <div class="flex gap-2 mt-2" style="justify-content: space-around;">
+        {% for i in range(7) %}
+        <div style="text-align: center;">
+            <div style="font-size: 1.25rem; font-weight: bold;">{{ stats.weekday_distribution[i] }}</div>
+            <div class="text-sm text-muted">{{ days[i][:3] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Recent Training Data -->
+{% if training_data %}
+<div class="card">
+    <h2>Recent Training Data (Last 50)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Severity</th>
+                <th>Confidence</th>
+                <th>Market Session</th>
+                <th>Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in training_data %}
+            <tr>
+                <td class="text-sm">{{ data.timestamp[:16] }}</td>
+                <td class="truncate">{{ data.event_title or 'N/A' }}</td>
+                <td>
+                    {% if data.severity_score >= 70 %}
+                    <span class="badge badge-danger">{{ data.severity_score }}</span>
+                    {% elif data.severity_score >= 50 %}
+                    <span class="badge badge-warning">{{ data.severity_score }}</span>
+                    {% else %}
+                    <span class="badge badge-info">{{ data.severity_score }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ "%.2f"|format(data.match_confidence) }}</td>
+                <td>
+                    <span class="badge badge-gray">{{ data.market_session or 'N/A' }}</span>
+                </td>
+                <td>
+                    {% if data.had_significant_impact %}
+                    <span class="badge badge-success">Yes</span>
+                    {% if data.impact_direction %}
+                    {% if data.impact_direction == 'up' %}
+                    <span style="color: green;">&#9650;</span>
+                    {% elif data.impact_direction == 'down' %}
+                    <span style="color: red;">&#9660;</span>
+                    {% endif %}
+                    {% endif %}
+                    {% elif data.had_significant_impact == False %}
+                    <span class="badge badge-gray">No</span>
+                    {% else %}
+                    <span class="text-muted">Pending</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

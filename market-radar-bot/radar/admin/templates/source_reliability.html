@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Source Reliability - {{ source.name if source else 'Unknown' }} - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Source Reliability: {{ source.name if source else 'Unknown' }}</h1>
+    <a href="/admin/learning" class="btn btn-secondary">Back to Learning</a>
+</div>
+
+{% if stats.status == 'no_data' %}
+<div class="alert alert-warning">
+    No reliability data available for this source yet. The system needs to process alerts and measure their market impact first.
+</div>
+{% else %}
+
+<!-- Demotion Warning -->
+{% if should_demote %}
+<div class="alert alert-warning">
+    <strong>Warning:</strong> This source may need attention. {{ demote_reason }}
+</div>
+{% endif %}
+
+<!-- Key Metrics -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.2f"|format(stats.reliability_score) }}</div>
+        <div class="stat-label">Reliability Score</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.tier_adjustment }}</div>
+        <div class="stat-label">Tier Adjustment</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_alerts }}</div>
+        <div class="stat-label">Total Alerts</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.high_severity_alerts }}</div>
+        <div class="stat-label">High Severity</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.1f"|format(stats.false_positive_rate * 100) }}%</div>
+        <div class="stat-label">False Positive Rate</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.1f"|format(stats.avg_actual_impact) }}</div>
+        <div class="stat-label">Avg. Impact Score</div>
+    </div>
+</div>
+
+<!-- Prediction Accuracy -->
+<div class="card">
+    <h2>Prediction Accuracy</h2>
+    <div class="flex gap-2 mt-2">
+        <div style="flex: 1;">
+            <div class="text-sm text-muted">Accurate Predictions</div>
+            <div style="font-size: 1.5rem; color: var(--success);">{{ stats.accurate_predictions }}</div>
+        </div>
+        <div style="flex: 1;">
+            <div class="text-sm text-muted">Inaccurate Predictions</div>
+            <div style="font-size: 1.5rem; color: var(--danger);">{{ stats.inaccurate_predictions }}</div>
+        </div>
+        <div style="flex: 1;">
+            <div class="text-sm text-muted">Accuracy Rate</div>
+            {% set total_preds = stats.accurate_predictions + stats.inaccurate_predictions %}
+            {% if total_preds > 0 %}
+            <div style="font-size: 1.5rem;">{{ "%.1f"|format(stats.accurate_predictions / total_preds * 100) }}%</div>
+            {% else %}
+            <div style="font-size: 1.5rem;">-</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not stats.is_mature %}
+    <p class="text-sm text-muted mt-4">
+        <em>Note: This source needs {{ 10 - stats.total_alerts }} more alerts before reliability adjustments will be applied.</em>
+    </p>
+    {% endif %}
+</div>
+
+<!-- Best Performing Hours -->
+{% if best_hours %}
+<div class="card">
+    <h2>Performance by Time of Day (UTC)</h2>
+    <p class="text-sm text-muted mb-4">When this source is most reliable.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Time Range</th>
+                <th>Alerts</th>
+                <th>Accuracy Rate</th>
+                <th>Avg. Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for hour in best_hours %}
+            <tr>
+                <td>{{ hour.hour_range }}</td>
+                <td>{{ hour.total_alerts }}</td>
+                <td>
+                    {% if hour.accuracy_rate >= 0.7 %}
+                    <span class="badge badge-success">{{ "%.0f"|format(hour.accuracy_rate * 100) }}%</span>
+                    {% elif hour.accuracy_rate >= 0.5 %}
+                    <span class="badge badge-warning">{{ "%.0f"|format(hour.accuracy_rate * 100) }}%</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ "%.0f"|format(hour.accuracy_rate * 100) }}%</span>
+                    {% endif %}
+                </td>
+                <td>{{ "%.1f"|format(hour.avg_impact) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Hourly Stats Breakdown -->
+{% if stats.hourly_stats %}
+<div class="card">
+    <h2>Detailed Hourly Statistics</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Hour Bucket (UTC)</th>
+                <th>Total Alerts</th>
+                <th>Accurate</th>
+                <th>Avg. Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for hour_key, hour_stats in stats.hourly_stats.items() %}
+            <tr>
+                <td>{{ hour_key }}:00 - {{ hour_key|int + 4 }}:00</td>
+                <td>{{ hour_stats.total }}</td>
+                <td>{{ hour_stats.accurate }}</td>
+                <td>{{ "%.1f"|format(hour_stats.avg_impact) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

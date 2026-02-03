@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Learning System - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h1>Learning System</h1>
+    <div class="flex gap-2">
+        <form action="/admin/learning/discover" method="post" style="display: inline;">
+            <button type="submit" class="btn btn-secondary">Discover Sources</button>
+        </form>
+        <form action="/admin/learning/validate-candidates" method="post" style="display: inline;">
+            <button type="submit" class="btn btn-secondary">Validate Candidates</button>
+        </form>
+        <a href="/admin/learning/export" class="btn btn-primary">Export Training Data</a>
+    </div>
+</div>
+
+{% if request.query_params.get('message') %}
+<div class="alert alert-success">
+    {{ request.query_params.get('message') }}
+</div>
+{% endif %}
+
+<!-- Source Reliability Rankings -->
+<div class="card">
+    <h2>Source Reliability Rankings</h2>
+    <p class="text-sm text-muted mb-4">Sources ranked by prediction accuracy. Requires 10+ alerts for ranking.</p>
+
+    {% if rankings %}
+    <table>
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Reliability Score</th>
+                <th>Tier Adjustment</th>
+                <th>Total Alerts</th>
+                <th>False Positive Rate</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for source in rankings %}
+            <tr>
+                <td>
+                    <a href="/admin/sources/{{ source.source_id }}">{{ source.source_name }}</a>
+                </td>
+                <td>
+                    {% if source.reliability_score >= 0.7 %}
+                    <span class="badge badge-success">{{ "%.2f"|format(source.reliability_score) }}</span>
+                    {% elif source.reliability_score >= 0.5 %}
+                    <span class="badge badge-warning">{{ "%.2f"|format(source.reliability_score) }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ "%.2f"|format(source.reliability_score) }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if source.tier_adjustment > 0 %}
+                    <span class="text-success">+{{ source.tier_adjustment }}</span>
+                    {% elif source.tier_adjustment < 0 %}
+                    <span class="text-danger">{{ source.tier_adjustment }}</span>
+                    {% else %}
+                    <span class="text-muted">0</span>
+                    {% endif %}
+                </td>
+                <td>{{ source.total_alerts }}</td>
+                <td>
+                    {% if source.false_positive_rate > 0.5 %}
+                    <span class="badge badge-danger">{{ "%.1f"|format(source.false_positive_rate * 100) }}%</span>
+                    {% else %}
+                    {{ "%.1f"|format(source.false_positive_rate * 100) }}%
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/learning/source/{{ source.source_id }}" class="btn btn-sm btn-secondary">Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No sources have enough data for reliability scoring yet. Sources need at least 10 alerts to be ranked.</p>
+    {% endif %}
+</div>
+
+<!-- Recent Impact History -->
+<div class="card">
+    <h2>Recent Detection History</h2>
+    <p class="text-sm text-muted mb-4">Recent detections with impact measurements for ML training.</p>
+
+    {% if recent_history %}
+    <table>
+        <thead>
+            <tr>
+                <th>Watch Item</th>
+                <th>Event</th>
+                <th>Severity</th>
+                <th>Impact</th>
+                <th>Direction</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in recent_history %}
+            <tr>
+                <td>
+                    <a href="/admin/learning/history/{{ h.watch_item_id if h.watch_item_id else '' }}">{{ h.watch_item_name }}</a>
+                </td>
+                <td class="truncate">{{ h.event_title or 'N/A' }}</td>
+                <td>
+                    {% if h.severity_score >= 70 %}
+                    <span class="badge badge-danger">{{ h.severity_score }}</span>
+                    {% elif h.severity_score >= 50 %}
+                    <span class="badge badge-warning">{{ h.severity_score }}</span>
+                    {% else %}
+                    <span class="badge badge-info">{{ h.severity_score }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if h.had_significant_impact %}
+                    <span class="badge badge-success">Significant</span>
+                    {% elif h.had_significant_impact == False %}
+                    <span class="badge badge-gray">Minimal</span>
+                    {% else %}
+                    <span class="badge badge-gray">Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if h.impact_direction == 'up' %}
+                    <span style="color: green;">&#9650; Up</span>
+                    {% elif h.impact_direction == 'down' %}
+                    <span style="color: red;">&#9660; Down</span>
+                    {% elif h.impact_direction == 'mixed' %}
+                    <span style="color: gray;">&#9644; Mixed</span>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm text-muted">{{ h.created_at.strftime('%Y-%m-%d %H:%M') if h.created_at else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No detection history yet. Alerts will appear here after being processed.</p>
+    {% endif %}
+</div>
+
+<!-- Source Candidates -->
+<div class="card">
+    <h2>Source Candidates for Review</h2>
+    <p class="text-sm text-muted mb-4">Validated sources ready to be promoted to active sources.</p>
+
+    {% if candidates %}
+    <table>
+        <thead>
+            <tr>
+                <th>URL</th>
+                <th>Type</th>
+                <th>Suggested Tier</th>
+                <th>Discovered Via</th>
+                <th>Sample Content</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in candidates %}
+            <tr>
+                <td class="truncate">
+                    <a href="{{ c.url }}" target="_blank">{{ c.url }}</a>
+                </td>
+                <td>{{ c.source_type }}</td>
+                <td>{{ c.suggested_tier }}</td>
+                <td>{{ c.discovered_via }}</td>
+                <td class="text-sm">
+                    {% if c.validation_results and c.validation_results.sample_items %}
+                    {{ c.validation_results.sample_items[0][:50] }}...
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>
+                    <form action="/admin/learning/promote/{{ c.id }}" method="post" style="display: inline-flex; gap: 0.25rem;">
+                        <input type="text" name="name" placeholder="Source name" required style="width: 120px; padding: 0.25rem;">
+                        <select name="tier" style="width: 60px; padding: 0.25rem;">
+                            <option value="1">T1</option>
+                            <option value="2">T2</option>
+                            <option value="3" selected>T3</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary">Promote</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No validated candidates ready for review. Click "Discover Sources" to find new sources.</p>
+    {% endif %}
+</div>
+{% endblock %}

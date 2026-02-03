@@ -339,3 +339,315 @@ class AppSettings(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+
+
+# =============================================================================
+# LEARNING SYSTEM MODELS
+# =============================================================================
+
+class ImpactStatus(str, enum.Enum):
+    """Status of market impact measurement."""
+    PENDING = "pending"          # Waiting for price data
+    MEASURED = "measured"        # Impact calculated
+    NO_DATA = "no_data"          # Could not get price data
+    INSUFFICIENT = "insufficient"  # Not enough data points
+
+
+class MarketImpact(Base):
+    """
+    Tracks actual market impact after an alert is sent.
+    Used to learn which sources/alerts actually move markets.
+    """
+    __tablename__ = "market_impacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    detection_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("detections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    # The asset being tracked (e.g., "EURUSD", "SPX", "GOLD")
+    asset_symbol: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+
+    # Price at alert time (T+0)
+    price_at_alert: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    alert_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # Price changes at various intervals (percentage)
+    change_5min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    change_15min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    change_1hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    change_4hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    change_24hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Absolute prices at intervals
+    price_5min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_15min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_1hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_4hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_24hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Volatility metrics
+    max_move_up: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Max % up in 24hr
+    max_move_down: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Max % down in 24hr
+
+    # Computed impact score (0-100, based on actual price movement)
+    actual_impact_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Did this alert predict correctly? (high severity = significant move)
+    was_accurate: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+    # Status
+    status: Mapped[ImpactStatus] = mapped_column(
+        Enum(ImpactStatus),
+        default=ImpactStatus.PENDING
+    )
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    measured_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_market_impact_detection_asset", "detection_id", "asset_symbol"),
+    )
+
+    # Relationships
+    detection: Mapped["Detection"] = relationship("Detection", backref="market_impacts")
+
+
+class SourceReliability(Base):
+    """
+    Tracks reliability metrics for each source over time.
+    Used to dynamically adjust source tier/scoring.
+    """
+    __tablename__ = "source_reliability"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False
+    )
+
+    # Alert statistics
+    total_alerts: Mapped[int] = mapped_column(Integer, default=0)
+    high_severity_alerts: Mapped[int] = mapped_column(Integer, default=0)  # Score >= 70
+
+    # Accuracy metrics
+    accurate_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    inaccurate_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    pending_measurements: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Computed reliability score (0.0 - 1.0)
+    # = accurate_predictions / (accurate + inaccurate) with smoothing
+    reliability_score: Mapped[float] = mapped_column(Float, default=0.5)
+
+    # Dynamic tier adjustment (-20 to +20 points added to severity)
+    tier_adjustment: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Average actual impact of alerts from this source
+    avg_actual_impact: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # False positive rate (high score but no impact)
+    false_positive_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Statistics by time of day (JSON: {hour: {alerts: N, accuracy: X}})
+    hourly_stats: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
+
+    # Last time metrics were recalculated
+    last_calculated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Minimum alerts needed before adjusting tier
+    min_alerts_for_adjustment: Mapped[int] = mapped_column(Integer, default=10)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    source: Mapped["Source"] = relationship("Source", backref="reliability")
+
+
+class WatchItemHistory(Base):
+    """
+    Historical record of all news and their effects for a watch item.
+    Designed for future ML training on price prediction.
+    """
+    __tablename__ = "watch_item_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    watch_item_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("watch_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    detection_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("detections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    # Snapshot of the news at the time
+    event_title: Mapped[str] = mapped_column(String(1024), nullable=False)
+    event_excerpt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    event_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_tier: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # Detection details
+    severity_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    match_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    trigger_quotes: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)  # The citation quotes
+    matched_keywords: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
+
+    # Timing
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # Market impact summary (JSON with all assets and their impacts)
+    # Format: {"EURUSD": {"5min": 0.05, "1hr": 0.12, ...}, "GOLD": {...}}
+    market_impacts: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
+
+    # Overall impact assessment
+    had_significant_impact: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    impact_direction: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # "up", "down", "mixed", "none"
+
+    # For ML features
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=Monday
+    hour_of_day: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_market_hours: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_history_watch_item_date", "watch_item_id", "detected_at"),
+    )
+
+    # Relationships
+    watch_item: Mapped["WatchItem"] = relationship("WatchItem", backref="history")
+    detection: Mapped["Detection"] = relationship("Detection", backref="history_entry")
+
+
+class SourcePoolStatus(str, enum.Enum):
+    """Status of a source in the pool."""
+    CANDIDATE = "candidate"      # Discovered, not yet validated
+    VALIDATING = "validating"    # Currently being tested
+    APPROVED = "approved"        # Validated, can be activated
+    REJECTED = "rejected"        # Tested and found unsuitable
+    ACTIVE = "active"            # Currently in use (promoted to sources table)
+    RETIRED = "retired"          # Was active, now removed
+
+
+class SourcePool(Base):
+    """
+    Pool of potential sources that can be activated.
+    Used for automatic source discovery and replacement.
+    """
+    __tablename__ = "source_pool"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Source info
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False, unique=True)
+    source_type: Mapped[SourceType] = mapped_column(Enum(SourceType), nullable=False)
+    suggested_tier: Mapped[SourceTier] = mapped_column(
+        Enum(SourceTier),
+        default=SourceTier.SECONDARY
+    )
+
+    # Status
+    status: Mapped[SourcePoolStatus] = mapped_column(
+        Enum(SourcePoolStatus),
+        default=SourcePoolStatus.CANDIDATE,
+        index=True
+    )
+
+    # Discovery info
+    discovered_via: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # "manual", "web_search", "link_extraction"
+    discovered_from_source_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # If found via another source
+
+    # Related topics (JSON array of watch item names/categories this might cover)
+    related_topics: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
+
+    # Validation results
+    validation_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    validation_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    validation_articles_count: Mapped[int] = mapped_column(Integer, default=0)
+    validation_matches_count: Mapped[int] = mapped_column(Integer, default=0)
+    validation_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # If promoted to active source
+    promoted_source_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("sources.id", ondelete="SET NULL"),
+        nullable=True
+    )
+    promoted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # If retired/rejected
+    retired_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    retired_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+
+class PriceData(Base):
+    """
+    Historical price data for assets.
+    Used to calculate market impact.
+    """
+    __tablename__ = "price_data"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Asset identifier (e.g., "EURUSD", "SPX", "GOLD", "BTC")
+    symbol: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+
+    # Price and time
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Optional OHLCV data
+    open: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    high: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    low: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    close: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    volume: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Data source
+    data_source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "timestamp", name="uq_price_symbol_time"),
+        Index("ix_price_symbol_timestamp", "symbol", "timestamp"),
+    )
+
+
+class LearningConfig(Base):
+    """
+    Configuration for the learning system.
+    """
+    __tablename__ = "learning_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
