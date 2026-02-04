@@ -13,6 +13,7 @@ import pytz
 import structlog
 
 from radar.config import get_settings
+from radar.notify.translator import PersianTranslator
 
 logger = structlog.get_logger()
 
@@ -95,7 +96,7 @@ class TelegramNotifier:
         return self._send_with_retry(message)
 
     def _format_message(self, data: AlertData) -> str:
-        """Format alert data into a Telegram message using HTML."""
+        """Format alert data into a Telegram message using HTML with Persian translation."""
         # Severity emoji
         if data.severity_score >= 90:
             severity_emoji = "🚨"
@@ -109,17 +110,35 @@ class TelegramNotifier:
         # Format assets
         assets_text = ", ".join(data.assets_affected) if data.assets_affected else "—"
 
-        # Format citations (trigger spans)
+        # Try to translate title and quotes to Persian
+        translator = PersianTranslator()
+        translated = translator.translate(data.title, data.trigger_spans[:2])
+
+        # Use translated content if available
+        if translated:
+            title_text = translated["title"]
+            persian_quotes = translated.get("quotes", [])
+        else:
+            title_text = data.title[:200]
+            persian_quotes = []
+
+        # Format citations (Persian first, then English)
         citations_text = ""
-        for i, span in enumerate(data.trigger_spans[:2], 1):
-            escaped = self._escape_html(span)
-            citations_text += f"\n<i>{escaped}</i>"
+        for i, span in enumerate(data.trigger_spans[:2]):
+            # Add Persian translation if available
+            if i < len(persian_quotes) and persian_quotes[i]:
+                escaped_fa = self._escape_html(persian_quotes[i])
+                citations_text += f"\n<i>{escaped_fa}</i>"
+            # Add English original
+            escaped_en = self._escape_html(span)
+            citations_text += f"\n<i>({escaped_en})</i>"
 
         # Format timestamp
         timestamp = self._format_timestamp(data.published_at or datetime.utcnow())
 
-        # Build message using HTML
-        message = f"""{severity_emoji} <b>{self._escape_html(data.title[:200])}</b>
+        # Build message using HTML (Persian title with English in parentheses)
+        message = f"""{severity_emoji} <b>{self._escape_html(title_text)}</b>
+<i>({self._escape_html(data.title[:200])})</i>
 
 📊 <b>Watch Item:</b> {self._escape_html(data.watch_item_name)}
 📁 <b>Category:</b> {self._escape_html(data.watch_item_category)}
