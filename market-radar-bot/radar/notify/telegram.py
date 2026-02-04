@@ -87,7 +87,7 @@ class TelegramNotifier:
             )
 
         message = (
-            "🔔 *Market Radar Bot - Test Message*\n\n"
+            "🔔 <b>Market Radar Bot - Test Message</b>\n\n"
             "✅ Telegram integration is working correctly!\n\n"
             f"Timestamp: {self._format_timestamp(datetime.utcnow())}"
         )
@@ -95,7 +95,7 @@ class TelegramNotifier:
         return self._send_with_retry(message)
 
     def _format_message(self, data: AlertData) -> str:
-        """Format alert data into a Telegram message."""
+        """Format alert data into a Telegram message using HTML."""
         # Severity emoji
         if data.severity_score >= 90:
             severity_emoji = "🚨"
@@ -112,25 +112,24 @@ class TelegramNotifier:
         # Format citations (trigger spans)
         citations_text = ""
         for i, span in enumerate(data.trigger_spans[:2], 1):
-            # Escape markdown characters
-            escaped = self._escape_markdown(span)
-            citations_text += f"\n_{escaped}_"
+            escaped = self._escape_html(span)
+            citations_text += f"\n<i>{escaped}</i>"
 
         # Format timestamp
         timestamp = self._format_timestamp(data.published_at or datetime.utcnow())
 
-        # Build message
-        message = f"""{severity_emoji} *{self._escape_markdown(data.title[:200])}*
+        # Build message using HTML
+        message = f"""{severity_emoji} <b>{self._escape_html(data.title[:200])}</b>
 
-📊 *Watch Item:* {self._escape_markdown(data.watch_item_name)}
-📁 *Category:* {data.watch_item_category}
-🎯 *Severity:* {data.severity_score}/100
-💯 *Confidence:* {int(data.match_confidence * 100)}%
-💰 *Assets:* {assets_text}
+📊 <b>Watch Item:</b> {self._escape_html(data.watch_item_name)}
+📁 <b>Category:</b> {self._escape_html(data.watch_item_category)}
+🎯 <b>Severity:</b> {data.severity_score}/100
+💯 <b>Confidence:</b> {int(data.match_confidence * 100)}%
+💰 <b>Assets:</b> {self._escape_html(assets_text)}
 
-📝 *Key Quote(s):*{citations_text}
+📝 <b>Key Quote(s):</b>{citations_text}
 
-🔗 [Source]({data.source_url})
+🔗 <a href="{data.source_url}">Source</a>
 🕐 {timestamp}"""
 
         return message
@@ -149,14 +148,16 @@ class TelegramNotifier:
         except Exception:
             return utc_time
 
-    def _escape_markdown(self, text: str) -> str:
-        """Escape Telegram MarkdownV2 special characters."""
-        # Characters that need escaping in MarkdownV2
-        # Using simpler Markdown mode, so escape only: _ * ` [
-        escape_chars = ['_', '*', '`', '[', ']', '(', ')']
-        for char in escape_chars:
-            text = text.replace(char, '\\' + char)
-        return text
+    def _escape_html(self, text: str) -> str:
+        """Escape HTML special characters for Telegram."""
+        if not text:
+            return ""
+        return (
+            text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
 
     def _send_with_retry(self, message: str) -> SendResult:
         """Send message with exponential backoff retry."""
@@ -195,7 +196,7 @@ class TelegramNotifier:
         payload = {
             "chat_id": self.settings.telegram_chat_id,
             "text": message,
-            "parse_mode": "Markdown",
+            "parse_mode": "HTML",
             "disable_web_page_preview": False,
         }
 

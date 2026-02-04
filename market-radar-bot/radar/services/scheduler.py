@@ -69,8 +69,12 @@ class Scheduler:
 
         logger.info("scheduler_started")
 
-        # Run immediately on startup
-        self._run_pipeline()
+        # Schedule immediate run (in background thread, not blocking)
+        self.scheduler.add_job(
+            self._run_pipeline,
+            id='radar_pipeline_initial',
+            name='Initial Pipeline Run',
+        )
 
         if blocking:
             try:
