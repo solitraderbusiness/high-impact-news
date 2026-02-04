@@ -472,6 +472,7 @@ async def events_list(
 async def alerts_list(
     request: Request,
     db: Session = Depends(get_db),
+    message: Optional[str] = None,
 ):
     """List sent alerts."""
     session = require_auth_redirect(request)
@@ -479,10 +480,74 @@ async def alerts_list(
         return RedirectResponse(url="/admin/login", status_code=302)
 
     alerts = storage.get_alerts(db, limit=100)
+    failed_count = len([a for a in alerts if not a.is_success])
 
     return templates.TemplateResponse(
         "alerts.html",
-        get_context(request, alerts=alerts)
+        get_context(request, alerts=alerts, failed_count=failed_count, message=message)
+    )
+
+
+@router.post("/alerts/retry-failed")
+async def retry_failed_alerts(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Retry all failed alerts."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from radar.notify.telegram import TelegramNotifier, AlertData
+
+    notifier = TelegramNotifier()
+    if not notifier.is_available:
+        return RedirectResponse(
+            url="/admin/alerts?message=Telegram+not+configured",
+            status_code=302
+        )
+
+    failed_alerts = storage.get_failed_alerts(db)
+    success_count = 0
+    fail_count = 0
+
+    for alert in failed_alerts:
+        detection = alert.detection
+        if not detection or not detection.event or not detection.watch_item:
+            continue
+
+        # Rebuild AlertData from detection
+        alert_data = AlertData(
+            title=detection.event.title or "Untitled",
+            watch_item_name=detection.watch_item.name,
+            watch_item_category=detection.watch_item.category.value,
+            severity_score=detection.severity_score,
+            match_confidence=detection.match_confidence,
+            assets_affected=detection.assets_affected or [],
+            trigger_spans=detection.trigger_spans or [],
+            source_url=detection.event.url or "",
+            published_at=detection.event.published_at,
+        )
+
+        result = notifier.send_alert(alert_data)
+
+        storage.update_alert_status(
+            db,
+            alert.id,
+            is_success=result.success,
+            telegram_message_id=result.message_id,
+            error_message=result.error if not result.success else None,
+        )
+
+        if result.success:
+            success_count += 1
+        else:
+            fail_count += 1
+
+    message = f"Retried:+{success_count}+succeeded,+{fail_count}+failed"
+    return RedirectResponse(
+        url=f"/admin/alerts?message={message}",
+        status_code=302
     )
 
 

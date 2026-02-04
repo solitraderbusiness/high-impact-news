@@ -505,6 +505,40 @@ def create_alert(
     return alert
 
 
+def get_failed_alerts(db: Session, limit: int = 100) -> List[AlertSent]:
+    """Get failed alerts that can be retried."""
+    query = (
+        select(AlertSent)
+        .options(joinedload(AlertSent.detection).joinedload(Detection.event))
+        .options(joinedload(AlertSent.detection).joinedload(Detection.watch_item))
+        .where(AlertSent.is_success == False)
+        .order_by(AlertSent.sent_at.desc())
+        .limit(limit)
+    )
+    return list(db.execute(query).unique().scalars().all())
+
+
+def update_alert_status(
+    db: Session,
+    alert_id: int,
+    is_success: bool,
+    telegram_message_id: Optional[int] = None,
+    error_message: Optional[str] = None,
+) -> Optional[AlertSent]:
+    """Update alert status after retry."""
+    alert = db.get(AlertSent, alert_id)
+    if alert:
+        alert.is_success = is_success
+        alert.retry_count += 1
+        if telegram_message_id:
+            alert.telegram_message_id = telegram_message_id
+        if error_message:
+            alert.error_message = error_message
+        db.commit()
+        db.refresh(alert)
+    return alert
+
+
 # =============================================================================
 # App Settings
 # =============================================================================

@@ -5,7 +5,20 @@
 {% block content %}
 <div class="flex justify-between items-center mb-4">
     <h1>Sent Alerts</h1>
+    {% if failed_count > 0 %}
+    <form action="/admin/alerts/retry-failed" method="post" style="display: inline;">
+        <button type="submit" class="btn btn-warning">
+            Retry Failed ({{ failed_count }})
+        </button>
+    </form>
+    {% endif %}
 </div>
+
+{% if message %}
+<div class="alert alert-info mb-4">
+    {{ message }}
+</div>
+{% endif %}
 
 <div class="card">
     <table>
