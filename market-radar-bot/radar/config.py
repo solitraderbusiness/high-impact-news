@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
 
+    # Timezone
+    timezone: str = Field(
+        default="Asia/Tehran",
+        description="Timezone for displaying timestamps (e.g., Asia/Tehran, Europe/Berlin)"
+    )
+
     @property
     def has_telegram(self) -> bool:
         """Check if Telegram credentials are configured."""

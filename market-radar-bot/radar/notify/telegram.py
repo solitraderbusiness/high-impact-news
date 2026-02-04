@@ -136,14 +136,16 @@ class TelegramNotifier:
         return message
 
     def _format_timestamp(self, dt: datetime) -> str:
-        """Format timestamp with UTC and Europe/Berlin timezone."""
+        """Format timestamp with UTC and configured local timezone."""
         utc_time = dt.strftime("%Y-%m-%d %H:%M UTC")
 
         try:
-            berlin_tz = pytz.timezone("Europe/Berlin")
-            berlin_time = dt.replace(tzinfo=pytz.UTC).astimezone(berlin_tz)
-            berlin_str = berlin_time.strftime("%H:%M Berlin")
-            return f"{utc_time} / {berlin_str}"
+            local_tz = pytz.timezone(self.settings.timezone)
+            local_time = dt.replace(tzinfo=pytz.UTC).astimezone(local_tz)
+            # Get a short name for the timezone
+            tz_name = self.settings.timezone.split("/")[-1].replace("_", " ")
+            local_str = local_time.strftime(f"%H:%M {tz_name}")
+            return f"{utc_time} / {local_str}"
         except Exception:
             return utc_time
 
