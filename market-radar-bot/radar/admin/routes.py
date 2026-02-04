@@ -18,7 +18,7 @@ from radar.auth import (
     get_current_session, require_auth_redirect
 )
 from radar.config import get_settings
-from radar.models import WatchItemCategory, SourceType, SourceTier
+from radar.models import WatchItemCategory, SourceType, SourceTier, AlertSent
 from radar.schemas import WatchItemCreate, WatchItemUpdate, SourceCreate, SourceUpdate
 from radar.notify.telegram import TelegramNotifier
 from radar.learning import (
@@ -545,6 +545,75 @@ async def retry_failed_alerts(
             fail_count += 1
 
     message = f"Retried:+{success_count}+succeeded,+{fail_count}+failed"
+    return RedirectResponse(
+        url=f"/admin/alerts?message={message}",
+        status_code=302
+    )
+
+
+@router.post("/alerts/{alert_id}/retry")
+async def retry_single_alert(
+    request: Request,
+    alert_id: int,
+    db: Session = Depends(get_db),
+):
+    """Retry a single failed alert."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from radar.notify.telegram import TelegramNotifier, AlertData
+
+    notifier = TelegramNotifier()
+    if not notifier.is_available:
+        return RedirectResponse(
+            url="/admin/alerts?message=Telegram+not+configured",
+            status_code=302
+        )
+
+    # Get the specific alert
+    alert = db.get(AlertSent, alert_id)
+    if not alert:
+        return RedirectResponse(
+            url="/admin/alerts?message=Alert+not+found",
+            status_code=302
+        )
+
+    detection = alert.detection
+    if not detection or not detection.event or not detection.watch_item:
+        return RedirectResponse(
+            url="/admin/alerts?message=Alert+data+incomplete",
+            status_code=302
+        )
+
+    # Rebuild AlertData from detection
+    alert_data = AlertData(
+        title=detection.event.title or "Untitled",
+        watch_item_name=detection.watch_item.name,
+        watch_item_category=detection.watch_item.category.value,
+        severity_score=detection.severity_score,
+        match_confidence=detection.match_confidence,
+        assets_affected=detection.assets_affected or [],
+        trigger_spans=detection.trigger_spans or [],
+        source_url=detection.event.url or "",
+        published_at=detection.event.published_at,
+    )
+
+    result = notifier.send_alert(alert_data)
+
+    storage.update_alert_status(
+        db,
+        alert.id,
+        is_success=result.success,
+        telegram_message_id=result.message_id,
+        error_message=result.error if not result.success else None,
+    )
+
+    if result.success:
+        message = "Alert+sent+successfully"
+    else:
+        message = f"Failed:+{result.error[:50] if result.error else 'Unknown'}"
+
     return RedirectResponse(
         url=f"/admin/alerts?message={message}",
         status_code=302

@@ -30,6 +30,7 @@
                 <th>Sent At</th>
                 <th>Status</th>
                 <th>Retries</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -82,10 +83,17 @@
                 <td class="text-sm">
                     {{ alert.retry_count }}
                 </td>
+                <td>
+                    {% if not alert.is_success %}
+                    <form action="/admin/alerts/{{ alert.id }}/retry" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-warning">Retry</button>
+                    </form>
+                    {% endif %}
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="text-center text-muted">
+                <td colspan="7" class="text-center text-muted">
                     No alerts sent yet. Alerts are sent when high-severity events are detected.
                 </td>
             </tr>
