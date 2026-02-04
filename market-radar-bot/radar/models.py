@@ -39,6 +39,7 @@ class SourceType(str, enum.Enum):
     """Types of sources."""
     RSS = "rss"
     WEB = "web"
+    TELEGRAM = "telegram"
 
 
 class SourceTier(str, enum.Enum):

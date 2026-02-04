@@ -19,9 +19,10 @@
 
         <div class="form-group">
             <label for="url">URL *</label>
-            <input type="url" id="url" name="url" required
+            <input type="text" id="url" name="url" required
                    value="{{ source.url if source else '' }}"
-                   placeholder="https://example.com/rss/feed.xml">
+                   placeholder="https://example.com/rss/feed.xml or @channelname">
+            <div class="help-text">For Telegram: use @channelname or https://t.me/channelname</div>
         </div>
 
         <div class="form-group">
@@ -34,7 +35,7 @@
                 </option>
                 {% endfor %}
             </select>
-            <div class="help-text">RSS for feeds, WEB for scraping HTML pages</div>
+            <div class="help-text">RSS for feeds, WEB for scraping HTML pages, TELEGRAM for Telegram channels</div>
         </div>
 
         <div class="form-group">

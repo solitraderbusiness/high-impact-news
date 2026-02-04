@@ -13,6 +13,7 @@ from radar.db import get_db_context
 from radar import storage
 from radar.models import Source, WatchItem, Event, SourceType, SourceTier
 from radar.collectors import RSSCollector, WebCollector
+from radar.collectors.telegram import TelegramChannelCollector
 from radar.collectors.rss import CollectedItem
 from radar.detect.rules import RuleMatcher, WatchItemRules
 from radar.detect.llm_openrouter import OpenRouterClient, WatchItemInfo
@@ -45,6 +46,7 @@ class Pipeline:
         self.settings = get_settings()
         self.rss_collector = RSSCollector()
         self.web_collector = WebCollector()
+        self.telegram_collector = TelegramChannelCollector()
         self.rule_matcher = RuleMatcher()
         self.llm_client = OpenRouterClient()
         self.scorer = SeverityScorer()
@@ -207,6 +209,11 @@ class Pipeline:
             )
             if item:
                 items = [item]
+        elif source.source_type == SourceType.TELEGRAM:
+            items, new_etag, new_modified = self.telegram_collector.collect(
+                source.url,
+                last_published_at=last_published,
+            )
 
         # Store new items
         latest_published = last_published
