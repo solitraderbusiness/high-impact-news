@@ -66,11 +66,9 @@ async def lifespan(app: FastAPI):
     logger.info("initializing_database")
     init_db()
 
-    # Start background scheduler if configured
-    # Note: In production, you might want to run the scheduler separately
-    # For MVP, we can optionally start it with the web server
-    # scheduler = Scheduler()
-    # scheduler.start(blocking=False)
+    # Start background scheduler for monitoring
+    scheduler = Scheduler()
+    scheduler.start(blocking=False)
 
     logger.info("application_started", host=settings.host, port=settings.port)
 
