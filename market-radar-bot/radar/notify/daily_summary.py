@@ -22,8 +22,10 @@ class AssetSentiment:
     """Sentiment data for a single asset."""
     symbol: str
     sentiment: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
+    confidence: str = "MEDIUM"  # HIGH, MEDIUM, LOW
     news_count: int = 0
     key_drivers: List[str] = field(default_factory=list)
+    outlook: str = ""
     price_change_pct: Optional[float] = None
     current_price: Optional[float] = None
 
@@ -31,11 +33,21 @@ class AssetSentiment:
     def sentiment_emoji(self) -> str:
         """Get emoji for sentiment."""
         if self.sentiment == "BULLISH":
-            return "📈"
+            return "🟢"
         elif self.sentiment == "BEARISH":
-            return "📉"
+            return "🔴"
         else:
-            return "➖"
+            return "⚪"
+
+    @property
+    def confidence_indicator(self) -> str:
+        """Get confidence indicator."""
+        if self.confidence == "HIGH":
+            return "●●●"
+        elif self.confidence == "MEDIUM":
+            return "●●○"
+        else:
+            return "●○○"
 
 
 @dataclass
@@ -121,13 +133,21 @@ class DailySummaryGenerator:
 
         if llm_analysis:
             for asset_data in llm_analysis.get("assets", []):
-                symbol = asset_data.get("symbol", "").upper()
+                symbol = asset_data.get("symbol", "")
                 if symbol:
+                    # Try to match news count with variations
+                    count = asset_news_count.get(symbol.upper(), 0)
+                    # Handle combined symbols like "USD (DXY)"
+                    if "USD" in symbol.upper():
+                        count = max(count, asset_news_count.get("USD", 0), asset_news_count.get("DXY", 0))
+
                     assets[symbol] = AssetSentiment(
                         symbol=symbol,
                         sentiment=asset_data.get("sentiment", "NEUTRAL").upper(),
-                        news_count=asset_news_count.get(symbol, 0),
+                        confidence=asset_data.get("confidence", "MEDIUM").upper(),
+                        news_count=count,
                         key_drivers=asset_data.get("key_drivers", []),
+                        outlook=asset_data.get("outlook", ""),
                     )
 
         # Add any assets that were in news but not in LLM response
@@ -167,40 +187,62 @@ class DailySummaryGenerator:
             for item in news_items[:50]  # Limit to 50 news items
         ])
 
-        prompt = f"""You are a senior financial market analyst. Analyze the following market news from the last 24 hours and provide a sentiment summary.
+        prompt = f"""You are a senior financial market analyst at a major investment bank writing an end-of-day market summary for institutional clients.
 
-NEWS ITEMS:
+TODAY'S NEWS FLOW:
 {news_text}
 
-TASK:
-1. For each major asset mentioned (GOLD, USD, DXY, EUR, EURUSD, GBP, JPY, OIL, BTC, S&P 500, US TREASURIES, GERMAN BUNDS), determine:
-   - Overall sentiment: BULLISH, BEARISH, or NEUTRAL
-   - Key drivers (1-2 bullet points explaining why)
+TASK: Write a professional analyst-style daily market summary.
 
-2. Write a brief 2-3 sentence market overview.
+CRITICAL RULES:
+1. LOGICAL CONSISTENCY IS MANDATORY:
+   - If USD is BEARISH and EUR is NEUTRAL → EURUSD must be BULLISH (weaker dollar = higher EUR/USD)
+   - If USD is BULLISH and EUR is NEUTRAL → EURUSD must be BEARISH
+   - If GOLD is BULLISH and USD is BEARISH → These are consistent (inverse correlation)
+   - DXY and USD must have the SAME sentiment (they measure the same thing)
+
+2. Consolidate related instruments - don't list both USD and DXY separately with different views
+
+3. For each asset, provide actionable insight, not just a description
+
+4. The overview should read like a Bloomberg or Reuters market wrap
 
 Respond in JSON format:
 {{
-    "overview": "<brief 2-3 sentence market summary>",
+    "overview": "<Write 3-4 sentences as a senior market strategist would. Start with the dominant theme, then key drivers, then outlook. Be specific about direction and catalysts.>",
     "assets": [
         {{
             "symbol": "GOLD",
             "sentiment": "BULLISH",
-            "key_drivers": ["Safe haven demand amid uncertainty", "Fed policy expectations"]
+            "confidence": "HIGH",
+            "key_drivers": ["Safe-haven demand on risk-off sentiment", "Real yields declining as Fed cut expectations rise"],
+            "outlook": "Targeting $2,080 resistance; dips toward $2,020 support likely bought"
         }},
         {{
-            "symbol": "USD",
+            "symbol": "USD (DXY)",
             "sentiment": "BEARISH",
-            "key_drivers": ["Rate cut expectations", "Trade policy uncertainty"]
+            "confidence": "MEDIUM",
+            "key_drivers": ["Fed rate cut pricing increasing", "Trade policy uncertainty weighing"],
+            "outlook": "Index testing 103.50 support; break opens 102.80"
+        }},
+        {{
+            "symbol": "EURUSD",
+            "sentiment": "BULLISH",
+            "confidence": "MEDIUM",
+            "key_drivers": ["USD weakness dominant factor", "ECB holding steady provides relative support"],
+            "outlook": "Path of least resistance higher toward 1.0950"
         }}
     ]
 }}
 
-IMPORTANT:
-- Only include assets that have relevant news
-- Be specific about what's driving sentiment
-- Sentiment should reflect the NET impact of all news (not just one headline)
-- Consider how different news items might offset or reinforce each other"""
+ASSET GUIDELINES:
+- Combine USD/DXY into one entry as "USD (DXY)"
+- EURUSD sentiment must be logically consistent with USD sentiment
+- Include: GOLD, USD (DXY), EURUSD, US TREASURIES, S&P 500, OIL if relevant
+- confidence: HIGH (strong consensus), MEDIUM (mixed signals), LOW (uncertain)
+- outlook: Brief 1-sentence trading view with key levels if possible
+
+Remember: Institutional clients will act on this analysis. Be precise and logically consistent."""
 
         try:
             headers = {
@@ -214,7 +256,7 @@ IMPORTANT:
                 "model": self.settings.openrouter_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
-                "max_tokens": 1500,
+                "max_tokens": 2000,
             }
 
             with httpx.Client(timeout=60.0) as client:
@@ -301,70 +343,82 @@ IMPORTANT:
         return None
 
     def format_telegram_message(self, summary: DailySummary) -> str:
-        """Format summary as Telegram message."""
+        """Format summary as professional Telegram message."""
         import pytz
 
         tehran_tz = pytz.timezone("Asia/Tehran")
         tehran_time = summary.date.replace(tzinfo=pytz.UTC).astimezone(tehran_tz)
 
         lines = [
-            "📊 <b>DAILY MARKET SENTIMENT SUMMARY</b>",
-            f"📅 {tehran_time.strftime('%Y-%m-%d')}",
+            "📊 <b>MARKET DAILY WRAP</b>",
+            f"<i>{tehran_time.strftime('%A, %B %d, %Y')}</i>",
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
         ]
 
         # Market overview from LLM
         if summary.market_overview:
-            lines.append(f"<i>{summary.market_overview}</i>")
+            lines.append("<b>MARKET OVERVIEW</b>")
+            lines.append(f"{summary.market_overview}")
+            lines.append("")
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             lines.append("")
 
-        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("<b>ASSET VIEWS</b>")
         lines.append("")
 
-        # Sort assets by news count
-        sorted_assets = sorted(
-            summary.assets.values(),
-            key=lambda x: x.news_count,
-            reverse=True
-        )
+        # Sort assets - prioritize those with analysis, then by sentiment strength
+        def sort_key(a):
+            sentiment_order = {"BULLISH": 0, "BEARISH": 1, "NEUTRAL": 2}
+            confidence_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+            return (
+                0 if a.outlook else 1,  # Assets with outlook first
+                sentiment_order.get(a.sentiment, 2),
+                confidence_order.get(a.confidence, 1),
+            )
 
-        for asset in sorted_assets[:10]:  # Top 10 assets
+        sorted_assets = sorted(summary.assets.values(), key=sort_key)
+
+        for asset in sorted_assets[:8]:  # Top 8 assets
             emoji = asset.sentiment_emoji
             sentiment = asset.sentiment
+            conf = asset.confidence_indicator
 
-            # Price change line
-            price_line = ""
-            if asset.price_change_pct is not None:
-                price_emoji = "🟢" if asset.price_change_pct >= 0 else "🔴"
-                price_sign = "+" if asset.price_change_pct >= 0 else ""
-                price_line = f"   {price_emoji} 24h: {price_sign}{asset.price_change_pct:.2f}%"
-                if asset.current_price:
-                    price_line += f" (${asset.current_price:,.2f})"
+            # Header line with sentiment
+            lines.append(f"{emoji} <b>{asset.symbol}</b> — {sentiment} {conf}")
 
-            lines.append(f"<b>{asset.symbol}</b>")
-            lines.append(f"{emoji} {sentiment} ({asset.news_count} news)")
-
-            # Key drivers from LLM
+            # Key drivers
             if asset.key_drivers:
                 for driver in asset.key_drivers[:2]:
-                    lines.append(f"   • {driver[:60]}")
+                    lines.append(f"   ▸ {driver[:70]}")
 
-            if price_line:
-                lines.append(price_line)
+            # Outlook (trading view)
+            if asset.outlook:
+                lines.append(f"   <i>→ {asset.outlook[:80]}</i>")
+
+            # Price change
+            if asset.price_change_pct is not None:
+                price_emoji = "▲" if asset.price_change_pct >= 0 else "▼"
+                price_sign = "+" if asset.price_change_pct >= 0 else ""
+                price_str = f"   {price_emoji} Today: {price_sign}{asset.price_change_pct:.2f}%"
+                if asset.current_price:
+                    price_str += f" @ ${asset.current_price:,.2f}"
+                lines.append(price_str)
 
             lines.append("")
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
 
-        # Top stories
+        # Top headlines
         if summary.top_stories:
-            lines.append("<b>📝 TOP STORIES:</b>")
+            lines.append("<b>KEY HEADLINES</b>")
             for i, (title, score, watch_item) in enumerate(summary.top_stories[:5], 1):
-                lines.append(f"{i}. {title[:50]}{'...' if len(title) > 50 else ''}")
+                lines.append(f"{i}. {title[:55]}{'...' if len(title) > 55 else ''}")
             lines.append("")
 
-        lines.append(f"📊 Total alerts: {summary.total_alerts}")
-        lines.append(f"🕐 {tehran_time.strftime('%H:%M')} Tehran")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append(f"<i>Based on {summary.total_alerts} alerts • {tehran_time.strftime('%H:%M')} Tehran</i>")
 
         return "\n".join(lines)
