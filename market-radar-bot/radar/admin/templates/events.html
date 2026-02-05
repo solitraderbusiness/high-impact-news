@@ -16,7 +16,7 @@
                 <th>Source</th>
                 <th>Published</th>
                 <th>Fetched</th>
-                <th>Processed</th>
+                <th>Score</th>
                 <th>Detections</th>
             </tr>
         </thead>
@@ -41,20 +41,25 @@
                     {% endif %}
                 </td>
                 <td class="text-sm">
-                    {% if event.published_at %}
-                        {{ event.published_at.strftime('%Y-%m-%d %H:%M') }}
-                    {% else %}
-                        <span class="text-muted">-</span>
-                    {% endif %}
+                    {{ event.published_at|to_tehran }}
                 </td>
                 <td class="text-sm">
-                    {{ event.fetched_at.strftime('%Y-%m-%d %H:%M') }}
+                    {{ event.fetched_at|to_tehran }}
                 </td>
-                <td>
-                    {% if event.is_processed %}
-                        <span class="badge badge-success">Yes</span>
+                <td class="text-sm">
+                    {% if event.detections %}
+                        {% set max_score = event.detections|map(attribute='severity_score')|max %}
+                        {% if max_score >= 90 %}
+                            <span class="badge badge-danger">{{ max_score }}</span>
+                        {% elif max_score >= 70 %}
+                            <span class="badge badge-warning">{{ max_score }}</span>
+                        {% elif max_score >= 50 %}
+                            <span class="badge badge-info">{{ max_score }}</span>
+                        {% else %}
+                            <span class="badge">{{ max_score }}</span>
+                        {% endif %}
                     {% else %}
-                        <span class="badge badge-warning">Pending</span>
+                        <span class="text-muted">-</span>
                     {% endif %}
                 </td>
                 <td class="text-sm">

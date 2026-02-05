@@ -3,9 +3,11 @@ Admin panel routes with Jinja2 templates.
 """
 
 import json
+from datetime import datetime
 from typing import Optional
 from pathlib import Path
 
+import pytz
 from fastapi import APIRouter, Depends, Form, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -33,6 +35,26 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # Set up templates
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+
+
+# Add custom Jinja2 filter for timezone conversion
+def to_tehran_time(dt: Optional[datetime]) -> str:
+    """Convert datetime to Tehran timezone string."""
+    if not dt:
+        return "-"
+    try:
+        tehran_tz = pytz.timezone("Asia/Tehran")
+        # Assume UTC if no timezone info
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        tehran_time = dt.astimezone(tehran_tz)
+        return tehran_time.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return dt.strftime("%Y-%m-%d %H:%M") if dt else "-"
+
+
+# Register the filter with Jinja2
+templates.env.filters["to_tehran"] = to_tehran_time
 
 
 def get_context(request: Request, **kwargs) -> dict:
