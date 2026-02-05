@@ -196,6 +196,22 @@ class DailySummaryGenerator:
 
         return results
 
+    # Asset aliases - map asset names to alternative terms LLM might use
+    ASSET_SEARCH_TERMS = {
+        "S&P 500": ["s&p", "s&p 500", "sp500", "spx", "stocks", "equities", "stock market", "equity market", "us stocks", "american stocks"],
+        "USD": ["usd", "dollar", "greenback", "us dollar", "american dollar", "buck"],
+        "DXY": ["dxy", "dollar index", "usd index", "dollar strength"],
+        "US TREASURIES": ["treasuries", "treasury", "bonds", "us bonds", "t-bonds", "tbonds", "yields", "treasury yields"],
+        "GERMAN BUNDS": ["bunds", "german bonds", "german debt", "bund yields"],
+        "EUR": ["eur", "euro", "single currency", "common currency"],
+        "EURUSD": ["eurusd", "eur/usd", "euro dollar", "euro-dollar"],
+        "GOLD": ["gold", "xau", "bullion", "precious metal", "yellow metal", "gold price"],
+        "GBP": ["gbp", "pound", "sterling", "british pound", "cable"],
+        "JPY": ["jpy", "yen", "japanese yen"],
+        "OIL": ["oil", "crude", "wti", "brent", "petroleum", "crude oil"],
+        "BTC": ["btc", "bitcoin", "crypto", "cryptocurrency"],
+    }
+
     def _detect_asset_direction(self, text: str, asset: str) -> str:
         """
         Detect bullish/bearish direction for an asset from analysis text.
@@ -206,12 +222,18 @@ class DailySummaryGenerator:
         text_lower = text.lower()
         asset_lower = asset.lower()
 
+        # Get all search terms for this asset (including aliases)
+        search_terms = self.ASSET_SEARCH_TERMS.get(asset.upper(), [asset_lower])
+        if asset_lower not in search_terms:
+            search_terms = [asset_lower] + list(search_terms)
+
         # Bullish keywords and phrases
         bullish_keywords = [
             'bullish', 'positive', 'strengthen', 'rise', 'rally', 'gain',
             'boost', 'support', 'higher', 'upward', 'increase', 'advance',
             'benefit', 'favorable', 'strong', 'robust', 'optimistic',
             'appreciation', 'soar', 'surge', 'climb', 'lift', 'upside',
+            'buy', 'long', 'bid', 'demand',
         ]
 
         # Bearish keywords and phrases
@@ -220,23 +242,22 @@ class DailySummaryGenerator:
             'pressure', 'lower', 'downward', 'decrease', 'sell-off',
             'unfavorable', 'weak', 'pessimistic', 'depreciation', 'slide',
             'sink', 'plunge', 'drag', 'downside', 'risk', 'hurt',
+            'sell', 'short', 'offer', 'supply',
         ]
-
-        # Find all positions where the asset is mentioned
-        asset_positions = [m.start() for m in re.finditer(re.escape(asset_lower), text_lower)]
-
-        if not asset_positions:
-            # Asset not directly mentioned, check for general sentiment
-            return "neutral"
 
         bullish_score = 0
         bearish_score = 0
 
-        # Check context around each asset mention (within ~100 chars)
-        for pos in asset_positions:
-            # Get surrounding context
-            start = max(0, pos - 100)
-            end = min(len(text_lower), pos + len(asset_lower) + 100)
+        # Find all positions where any search term is mentioned
+        all_positions = []
+        for term in search_terms:
+            positions = [m.start() for m in re.finditer(re.escape(term), text_lower)]
+            all_positions.extend(positions)
+
+        # Check context around each mention (within ~150 chars)
+        for pos in all_positions:
+            start = max(0, pos - 150)
+            end = min(len(text_lower), pos + 150)
             context = text_lower[start:end]
 
             # Count sentiment keywords in context
@@ -248,56 +269,61 @@ class DailySummaryGenerator:
                 if keyword in context:
                     bearish_score += 1
 
-        # Also check for common patterns anywhere in text
-        bullish_patterns = [
-            f"bullish for {asset_lower}",
-            f"bullish on {asset_lower}",
-            f"positive for {asset_lower}",
-            f"{asset_lower} strength",
-            f"{asset_lower} could rise",
-            f"{asset_lower} may rise",
-            f"{asset_lower} likely to rise",
-            f"support {asset_lower}",
-            f"supports {asset_lower}",
-            f"boost {asset_lower}",
-            f"boosts {asset_lower}",
-            f"lift {asset_lower}",
-            f"lifts {asset_lower}",
-            f"{asset_lower} rally",
-            f"{asset_lower} gains",
-            f"{asset_lower} higher",
-        ]
+        # Also check for common patterns with each search term
+        for term in search_terms:
+            bullish_patterns = [
+                f"bullish for {term}", f"bullish on {term}",
+                f"positive for {term}", f"positive on {term}",
+                f"{term} strength", f"{term} strong",
+                f"{term} could rise", f"{term} may rise", f"{term} will rise",
+                f"{term} likely to rise", f"{term} expected to rise",
+                f"support {term}", f"supports {term}", f"supporting {term}",
+                f"boost {term}", f"boosts {term}", f"boosting {term}",
+                f"lift {term}", f"lifts {term}", f"lifting {term}",
+                f"{term} rally", f"{term} rallies", f"{term} rallying",
+                f"{term} gains", f"{term} gaining", f"{term} gain",
+                f"{term} higher", f"{term} up",
+                f"buy {term}", f"buying {term}", f"long {term}",
+            ]
 
-        bearish_patterns = [
-            f"bearish for {asset_lower}",
-            f"bearish on {asset_lower}",
-            f"negative for {asset_lower}",
-            f"{asset_lower} weakness",
-            f"{asset_lower} could fall",
-            f"{asset_lower} may fall",
-            f"{asset_lower} likely to fall",
-            f"pressure on {asset_lower}",
-            f"weigh on {asset_lower}",
-            f"weighs on {asset_lower}",
-            f"drag on {asset_lower}",
-            f"drags on {asset_lower}",
-            f"{asset_lower} decline",
-            f"{asset_lower} drops",
-            f"{asset_lower} lower",
-        ]
+            bearish_patterns = [
+                f"bearish for {term}", f"bearish on {term}",
+                f"negative for {term}", f"negative on {term}",
+                f"{term} weakness", f"{term} weak",
+                f"{term} could fall", f"{term} may fall", f"{term} will fall",
+                f"{term} likely to fall", f"{term} expected to fall",
+                f"pressure on {term}", f"pressures {term}",
+                f"weigh on {term}", f"weighs on {term}", f"weighing on {term}",
+                f"drag on {term}", f"drags on {term}", f"dragging on {term}",
+                f"{term} decline", f"{term} declines", f"{term} declining",
+                f"{term} drops", f"{term} dropping", f"{term} drop",
+                f"{term} lower", f"{term} down",
+                f"sell {term}", f"selling {term}", f"short {term}",
+            ]
 
-        for pattern in bullish_patterns:
-            if pattern in text_lower:
-                bullish_score += 2  # Direct patterns get more weight
+            for pattern in bullish_patterns:
+                if pattern in text_lower:
+                    bullish_score += 3  # Direct patterns get more weight
 
-        for pattern in bearish_patterns:
-            if pattern in text_lower:
-                bearish_score += 2
+            for pattern in bearish_patterns:
+                if pattern in text_lower:
+                    bearish_score += 3
 
-        # Determine direction based on scores
-        if bullish_score > bearish_score and bullish_score >= 2:
+        # If no mentions found at all, check overall sentiment of text
+        if not all_positions and not bullish_score and not bearish_score:
+            # Count overall sentiment in the entire text
+            for keyword in bullish_keywords:
+                if keyword in text_lower:
+                    bullish_score += 0.5
+
+            for keyword in bearish_keywords:
+                if keyword in text_lower:
+                    bearish_score += 0.5
+
+        # Determine direction based on scores (lowered threshold to 1)
+        if bullish_score > bearish_score and bullish_score >= 1:
             return "bullish"
-        elif bearish_score > bullish_score and bearish_score >= 2:
+        elif bearish_score > bullish_score and bearish_score >= 1:
             return "bearish"
         else:
             return "neutral"
