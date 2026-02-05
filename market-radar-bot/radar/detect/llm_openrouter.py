@@ -120,7 +120,7 @@ class OpenRouterClient:
             for w in watch_items
         ])
 
-        prompt = f"""You are an expert financial market analyst. Analyze the following news article and determine if it relates to any of the monitored entities/topics.
+        prompt = f"""You are a senior financial market analyst at a major investment bank. Analyze the following news article and determine if it relates to any of the monitored entities/topics.
 
 MONITORED ENTITIES/TOPICS:
 {items_text}
@@ -134,10 +134,13 @@ ARTICLE TEXT:
 TASK:
 1. Determine which monitored entity/topic (if any) this article is most relevant to.
 2. Extract 1-2 EXACT quotes from the article that support this match. These must be EXACT substrings from the article text - do not paraphrase or modify.
-3. Provide a DETAILED market impact analysis explaining:
-   - WHY this news is important for markets (not just what the news says)
-   - HOW it will affect specific assets and in what direction
-   - What traders and investors should watch for
+3. Write a professional analyst-style market impact assessment (5-10 sentences) that includes:
+   - The core event and its immediate significance
+   - Historical context or precedent (if relevant)
+   - First-order effects: direct market impact
+   - Second-order effects: knock-on consequences for related markets
+   - Key risk factors or uncertainties
+   - What traders should watch for (key levels, timing, catalysts)
 4. List specific assets with their expected direction (bullish/bearish).
 
 Respond in JSON format:
@@ -147,7 +150,7 @@ Respond in JSON format:
     "confidence": <0.0 to 1.0>,
     "citations": ["<exact quote 1>", "<exact quote 2 if relevant>"],
     "reasoning": "<brief one-line summary>",
-    "market_impact": "<DETAILED 2-4 sentence explanation of WHY this news matters for markets. Explain the cause and effect: what is happening, why it's significant, and what the likely market reaction will be. Do NOT repeat the headline - explain the IMPLICATIONS.>",
+    "market_impact": "<ANALYST-STYLE ASSESSMENT: Write 5-10 sentences as a senior financial analyst would. Start with the core significance, then explain the market mechanics (why this moves prices), historical context if relevant, potential second-order effects on related assets, key uncertainties/risks, and what to watch. Be specific about price direction expectations. Do NOT just summarize the headline - provide actionable insight.>",
     "assets_with_impact": [
         {{"symbol": "EUR", "direction": "bearish"}},
         {{"symbol": "EURUSD", "direction": "bearish"}},
@@ -160,7 +163,7 @@ IMPORTANT:
 - Only match if there is a clear, direct connection to the monitored entity.
 - If no match is appropriate, return match_id: null.
 - Confidence should reflect how certain you are of the match.
-- The market_impact field is CRITICAL - explain WHY and HOW, don't just repeat the headline.
+- The market_impact field is CRITICAL - write like a Bloomberg or Reuters analyst, not a news summary.
 - For assets_with_impact, use "bullish" for assets expected to rise, "bearish" for those expected to fall, "neutral" if uncertain."""
 
         return prompt
