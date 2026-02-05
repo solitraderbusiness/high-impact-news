@@ -8,6 +8,12 @@
     <span class="text-sm text-muted">Total: {{ total_count }} events</span>
 </div>
 
+{% if request.query_params.get('message') %}
+<div class="alert {% if 'success' in request.query_params.get('message').lower() %}alert-success{% else %}alert-warning{% endif %}">
+    {{ request.query_params.get('message').replace('+', ' ') }}
+</div>
+{% endif %}
+
 <div class="card">
     <table>
         <thead>
@@ -18,6 +24,7 @@
                 <th>Fetched</th>
                 <th>Score</th>
                 <th>Detections</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -69,10 +76,21 @@
                         <span class="text-muted">0</span>
                     {% endif %}
                 </td>
+                <td>
+                    {% if event.detections %}
+                        <form method="POST" action="/admin/events/{{ event.id }}/test-send" style="display: inline;">
+                            <button type="submit" class="btn btn-secondary btn-sm" title="Send test alert to Telegram">
+                                📤 Test
+                            </button>
+                        </form>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="text-center text-muted">
+                <td colspan="7" class="text-center text-muted">
                     No events collected yet. Run the collector to fetch events.
                 </td>
             </tr>

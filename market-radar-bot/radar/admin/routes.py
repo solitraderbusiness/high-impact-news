@@ -535,6 +535,81 @@ async def events_list(
     )
 
 
+@router.post("/events/{event_id}/test-send")
+async def test_send_event(
+    request: Request,
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    """Send a test alert for an event to Telegram."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from radar.notify.telegram import TelegramNotifier, AlertData, AssetWithDirection
+
+    # Get the event and its best detection
+    event = storage.get_event(db, event_id)
+    if not event:
+        return RedirectResponse(
+            url="/admin/events?message=Event+not+found",
+            status_code=302
+        )
+
+    if not event.detections:
+        return RedirectResponse(
+            url="/admin/events?message=Event+has+no+detections",
+            status_code=302
+        )
+
+    # Use the detection with highest score
+    detection = max(event.detections, key=lambda d: d.severity_score)
+
+    # Build assets with direction from detection
+    assets_with_direction = None
+    if detection.assets_affected:
+        # Simple fallback - no direction info stored in detection
+        assets_with_direction = [
+            AssetWithDirection(symbol=asset, direction="neutral")
+            for asset in detection.assets_affected[:6]
+        ]
+
+    # Build AlertData
+    alert_data = AlertData(
+        title=event.title or "Untitled",
+        watch_item_name=detection.watch_item.name if detection.watch_item else "Unknown",
+        watch_item_category=detection.watch_item.category.value if detection.watch_item else "unknown",
+        severity_score=detection.severity_score,
+        match_confidence=detection.match_confidence,
+        assets_affected=detection.assets_affected or [],
+        assets_with_direction=assets_with_direction,
+        trigger_spans=detection.trigger_spans or [],
+        source_url=event.url or "",
+        published_at=event.published_at,
+        market_impact=detection.llm_reasoning,  # This contains the market analysis
+    )
+
+    # Send test alert
+    notifier = TelegramNotifier()
+    if not notifier.is_available:
+        return RedirectResponse(
+            url="/admin/events?message=Telegram+not+configured",
+            status_code=302
+        )
+
+    result = notifier.send_alert(alert_data)
+
+    if result.success:
+        message = f"Test+alert+sent+successfully!"
+    else:
+        message = f"Failed:+{result.error[:50] if result.error else 'Unknown'}"
+
+    return RedirectResponse(
+        url=f"/admin/events?message={message}",
+        status_code=302
+    )
+
+
 # =============================================================================
 # Alerts
 # =============================================================================
