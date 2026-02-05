@@ -926,6 +926,36 @@ async def send_daily_summary(
     )
 
 
+@router.post("/settings/save-summary-schedule")
+async def save_summary_schedule(
+    request: Request,
+    db: Session = Depends(get_db),
+    daily_summary_enabled: Optional[str] = Form(None),
+    daily_summary_time: str = Form("18:00"),
+    daily_summary_hours: str = Form("24"),
+):
+    """Save daily summary schedule settings."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Save schedule settings
+    enabled = "1" if daily_summary_enabled else "0"
+    storage.set_app_setting(db, "daily_summary_enabled", enabled, "Enable automatic daily summary")
+    storage.set_app_setting(db, "daily_summary_time", daily_summary_time, "Time to send daily summary (Tehran)")
+    storage.set_app_setting(db, "daily_summary_hours", daily_summary_hours, "Hours to look back for summary")
+
+    if enabled == "1":
+        message = f"Schedule+saved!+Summary+will+be+sent+daily+at+{daily_summary_time}+Tehran"
+    else:
+        message = "Daily+summary+schedule+disabled"
+
+    return RedirectResponse(
+        url=f"/admin/settings?message={message}",
+        status_code=302
+    )
+
+
 # =============================================================================
 # Dashboard / Index
 # =============================================================================

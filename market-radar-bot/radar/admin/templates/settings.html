@@ -211,10 +211,45 @@
 <div class="card">
     <h2>📊 Daily Market Summary</h2>
     <p class="text-sm text-muted mb-4">
-        Generate and send a market sentiment summary based on recent alerts.
-        Shows sentiment analysis per asset and daily price changes.
+        Professional analyst-style market sentiment summary with price changes.
     </p>
 
+    <!-- Schedule Settings -->
+    <div class="mb-4" style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin-top: 0; font-size: 1rem;">⏰ Automatic Daily Schedule</h3>
+        <form method="POST" action="/admin/settings/save-summary-schedule" class="flex gap-2 items-center flex-wrap">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="daily_summary_enabled" value="1"
+                       {% if db_settings.get('daily_summary_enabled') == '1' %}checked{% endif %}>
+                <span>Enable daily summary</span>
+            </label>
+            <span class="text-sm">at</span>
+            <input type="time" name="daily_summary_time"
+                   value="{{ db_settings.get('daily_summary_time', '18:00') }}"
+                   class="form-input" style="width: 120px;">
+            <span class="text-sm">Tehran time</span>
+            <span class="text-sm">for last</span>
+            <select name="daily_summary_hours" class="form-input" style="width: 100px;">
+                {% set current_hours = db_settings.get('daily_summary_hours', '24') %}
+                <option value="12" {% if current_hours == '12' %}selected{% endif %}>12 hours</option>
+                <option value="24" {% if current_hours == '24' %}selected{% endif %}>24 hours</option>
+                <option value="48" {% if current_hours == '48' %}selected{% endif %}>48 hours</option>
+            </select>
+            <button type="submit" class="btn btn-secondary btn-sm">Save Schedule</button>
+        </form>
+        {% if db_settings.get('daily_summary_enabled') == '1' %}
+        <div class="text-sm text-muted mt-2">
+            ✅ Summary will be sent daily at {{ db_settings.get('daily_summary_time', '18:00') }} Tehran time
+        </div>
+        {% else %}
+        <div class="text-sm text-muted mt-2">
+            ⚪ Automatic daily summary is disabled
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Manual Send -->
+    <h3 style="font-size: 1rem;">📤 Send Now</h3>
     <form method="POST" action="/admin/settings/send-daily-summary" class="flex gap-2 items-center">
         <label class="text-sm" style="margin-bottom: 0;">Look back:</label>
         <select name="hours" class="form-input" style="width: 120px;">
@@ -225,17 +260,18 @@
             <option value="72">72 hours</option>
         </select>
         <button type="submit" class="btn btn-primary">
-            📤 Generate & Send Summary
+            Generate & Send Now
         </button>
     </form>
 
-    <div class="text-sm text-muted mt-2">
+    <div class="text-sm text-muted mt-4">
         <strong>Summary includes:</strong>
         <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-            <li>Sentiment analysis per asset (BULLISH/BEARISH/NEUTRAL)</li>
-            <li>24h price changes from Yahoo Finance</li>
-            <li>Top stories by severity score</li>
-            <li>Bullish/bearish news count per asset</li>
+            <li>Market overview from LLM analysis</li>
+            <li>Asset views with BULLISH/BEARISH sentiment and confidence</li>
+            <li>Key drivers and trading outlook for each asset</li>
+            <li>24h price changes</li>
+            <li>Top headlines</li>
         </ul>
     </div>
 </div>
