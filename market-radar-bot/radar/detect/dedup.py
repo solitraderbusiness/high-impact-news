@@ -15,7 +15,15 @@ from radar import storage
 logger = structlog.get_logger()
 
 # Threshold for Jaccard similarity to consider as near-duplicate
-TITLE_SIMILARITY_THRESHOLD = 0.7
+TITLE_SIMILARITY_THRESHOLD = 0.5  # Lowered from 0.7 to catch more duplicates
+
+# Keywords that indicate the same type of event
+EVENT_KEYWORDS = {
+    'rate_decision': ['rate', 'rates', 'interest', 'holds', 'hold', 'cut', 'hike', 'unchanged', 'steady'],
+    'inflation': ['inflation', 'cpi', 'prices', 'price'],
+    'gdp': ['gdp', 'growth', 'economy', 'economic'],
+    'employment': ['jobs', 'employment', 'unemployment', 'payroll', 'nfp'],
+}
 
 
 class Deduplicator:
@@ -88,7 +96,10 @@ class Deduplicator:
     ) -> Tuple[bool, Optional[str]]:
         """
         Check if there's a near-duplicate alert for the same watch item recently.
-        Uses Jaccard similarity to catch paraphrased versions of the same news.
+        Uses multiple strategies:
+        1. Jaccard similarity on full title
+        2. Core keyword matching (e.g., "ECB holds rates" matches "ECB leaves rates unchanged")
+        3. Event type detection (same type of event = likely duplicate)
 
         Args:
             db: Database session
@@ -111,21 +122,96 @@ class Deduplicator:
         )
 
         normalized_title = self.normalize_text(title)
+        title_keywords = self.extract_event_keywords(title)
 
         for recent_title in recent_alerts:
             normalized_recent = self.normalize_text(recent_title)
-            similarity = self.jaccard_similarity(normalized_title, normalized_recent)
 
+            # Strategy 1: Jaccard similarity
+            similarity = self.jaccard_similarity(normalized_title, normalized_recent)
             if similarity >= TITLE_SIMILARITY_THRESHOLD:
                 logger.debug(
                     "near_duplicate_detected",
+                    method="jaccard",
                     similarity=similarity,
                     title=title[:50],
                     similar_to=recent_title[:50],
                 )
                 return True, f"Similar to recent alert ({similarity:.0%} match)"
 
+            # Strategy 2: Core keyword matching
+            recent_keywords = self.extract_event_keywords(recent_title)
+            keyword_overlap = self.keyword_overlap_score(title_keywords, recent_keywords)
+            if keyword_overlap >= 0.6:
+                logger.debug(
+                    "near_duplicate_detected",
+                    method="keywords",
+                    overlap=keyword_overlap,
+                    title=title[:50],
+                    similar_to=recent_title[:50],
+                )
+                return True, f"Same event type as recent alert ({keyword_overlap:.0%} keyword match)"
+
         return False, None
+
+    def extract_event_keywords(self, title: str) -> Set[str]:
+        """
+        Extract key event-related words from a title.
+        Focuses on action words and entities that identify the event.
+        """
+        # Normalize
+        title_lower = title.lower()
+
+        # Extract meaningful words (remove common words)
+        stop_words = {
+            'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or',
+            'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'this', 'that', 'these', 'those', 'it', 'its',
+            'says', 'said', 'say', 'according', 'report', 'reports',
+            'video', 'live', 'update', 'updates', 'breaking', 'news',
+            'why', 'how', 'what', 'when', 'where', 'who',
+            'here', 'heres', "here's", 'now', 'just', 'also',
+        }
+
+        # Keep important financial/event words
+        words = re.findall(r'\b[a-z]+\b', title_lower)
+        keywords = set()
+
+        for word in words:
+            if word not in stop_words and len(word) > 2:
+                keywords.add(word)
+
+        return keywords
+
+    def keyword_overlap_score(self, keywords1: Set[str], keywords2: Set[str]) -> float:
+        """
+        Calculate overlap between two keyword sets.
+        Uses a weighted approach favoring important financial terms.
+        """
+        if not keywords1 or not keywords2:
+            return 0.0
+
+        # Important terms get higher weight
+        important_terms = {
+            'ecb', 'fed', 'boe', 'boj', 'rba', 'snb',  # Central banks
+            'rate', 'rates', 'interest', 'hold', 'holds', 'cut', 'cuts', 'hike', 'hikes',
+            'inflation', 'gdp', 'employment', 'unemployment',
+            'unchanged', 'steady', 'decision',
+        }
+
+        # Calculate weighted intersection
+        intersection = keywords1 & keywords2
+        important_matches = intersection & important_terms
+
+        # Score: (regular matches + 2*important matches) / union size
+        regular_matches = len(intersection - important_terms)
+        weighted_score = regular_matches + (2 * len(important_matches))
+        max_possible = len(keywords1 | keywords2) + len(important_terms & (keywords1 | keywords2))
+
+        if max_possible == 0:
+            return 0.0
+
+        return min(1.0, weighted_score / max_possible)
 
     def is_near_duplicate_title(
         self,
