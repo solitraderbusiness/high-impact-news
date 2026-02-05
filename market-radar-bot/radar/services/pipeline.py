@@ -312,9 +312,18 @@ class Pipeline:
         if matches:
             best_match = matches[0]
 
-        # Phase B: LLM fallback if low confidence
-        if (not best_match or best_match.confidence < self.settings.llm_confidence_threshold):
-            if self.llm_client.is_available:
+        # Phase B: LLM analysis
+        # Call LLM if: no match, low confidence match, OR we need market analysis
+        llm_match = None
+        if self.llm_client.is_available:
+            # Always try LLM if we have a match (for market analysis) or need to find a match
+            should_try_llm = (
+                not best_match or
+                best_match.confidence < self.settings.llm_confidence_threshold or
+                not getattr(best_match, 'market_impact', None)  # Need market analysis
+            )
+
+            if should_try_llm:
                 llm_items = [
                     WatchItemInfo(
                         id=wi.id,
@@ -331,7 +340,7 @@ class Pipeline:
                 if llm_match and llm_match.watch_item_id:
                     if (llm_match.confidence >= self.settings.llm_confidence_threshold and
                         llm_match.trigger_spans):
-                        # Use LLM match if it's better
+                        # Use LLM match if it's better OR if we need the market analysis
                         if not best_match or llm_match.confidence > best_match.confidence:
                             best_match = type('Match', (), {
                                 'watch_item_id': llm_match.watch_item_id,
@@ -344,6 +353,19 @@ class Pipeline:
                                 'market_impact': getattr(llm_match, 'market_impact', None),
                             })()
                             match_method = "llm"
+                        elif best_match and llm_match.watch_item_id == best_match.watch_item_id:
+                            # Same watch item - add LLM's market analysis to rule-based match
+                            best_match = type('Match', (), {
+                                'watch_item_id': best_match.watch_item_id,
+                                'watch_item_name': getattr(best_match, 'watch_item_name', None),
+                                'confidence': best_match.confidence,
+                                'trigger_spans': best_match.trigger_spans,
+                                'llm_reasoning': llm_match.reasoning,
+                                'assets_affected': llm_match.assets_affected or getattr(best_match, 'assets_affected', []),
+                                'assets_with_impact': getattr(llm_match, 'assets_with_impact', []),
+                                'market_impact': getattr(llm_match, 'market_impact', None),
+                            })()
+                            match_method = "rules+llm"
 
         # No match found
         if not best_match or not best_match.trigger_spans:
