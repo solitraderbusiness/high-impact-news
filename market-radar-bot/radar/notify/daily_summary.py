@@ -151,13 +151,33 @@ class DailySummaryGenerator:
                     )
 
         # Add any assets that were in news but not in LLM response
+        # But skip assets that are already covered by combined entries (e.g., "USD (DXY)")
+        covered_assets = set()
+        for symbol in assets.keys():
+            symbol_upper = symbol.upper()
+            # Track what's covered by combined symbols
+            if "USD" in symbol_upper:
+                covered_assets.add("USD")
+            if "DXY" in symbol_upper:
+                covered_assets.add("DXY")
+            if "EUR" in symbol_upper and "USD" in symbol_upper:
+                covered_assets.add("EURUSD")
+            covered_assets.add(symbol_upper)
+
         for asset, count in asset_news_count.items():
-            if asset not in assets:
-                assets[asset] = AssetSentiment(
-                    symbol=asset,
-                    sentiment="NEUTRAL",
-                    news_count=count,
-                )
+            asset_upper = asset.upper()
+            # Skip if already covered by LLM analysis
+            if asset_upper in covered_assets:
+                continue
+            # Skip if this is a variation already covered
+            if asset_upper in ["USD", "DXY"] and any("USD" in s.upper() for s in assets.keys()):
+                continue
+
+            assets[asset] = AssetSentiment(
+                symbol=asset,
+                sentiment="NEUTRAL",
+                news_count=count,
+            )
 
         # Fetch price changes
         self._fetch_price_changes(assets)
