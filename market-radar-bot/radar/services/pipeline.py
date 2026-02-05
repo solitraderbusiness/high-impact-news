@@ -331,6 +331,7 @@ class Pipeline:
                                 'trigger_spans': llm_match.trigger_spans,
                                 'llm_reasoning': llm_match.reasoning,
                                 'assets_affected': llm_match.assets_affected,
+                                'market_impact': getattr(llm_match, 'market_impact', None),
                             })()
                             match_method = "llm"
 
@@ -376,6 +377,9 @@ class Pipeline:
 
         # Get additional attributes from match
         llm_reasoning = getattr(best_match, 'llm_reasoning', None)
+        market_impact = getattr(best_match, 'market_impact', None)
+        # Use market_impact as reasoning if available (more detailed)
+        llm_reasoning = market_impact or llm_reasoning
         assets_from_match = getattr(best_match, 'assets_affected', None)
         assets_affected = assets_from_match or watch_item.assets_affected or []
 
@@ -396,12 +400,25 @@ class Pipeline:
         # Check if we should alert
         is_alerted = False
         if score_breakdown.total >= self.settings.alert_threshold:
+            # First check cooldown
             should_alert, suppression_reason = self.deduplicator.should_alert(
                 db,
                 watch_item.id,
                 score_breakdown.total,
                 watch_item.cooldown_minutes,
             )
+
+            # Then check for near-duplicates (same story from different sources)
+            if should_alert:
+                is_near_dup, dup_reason = self.deduplicator.is_near_duplicate_by_title(
+                    db,
+                    event.title,
+                    watch_item.id,
+                    hours=6,  # Look back 6 hours for similar news
+                )
+                if is_near_dup:
+                    should_alert = False
+                    suppression_reason = dup_reason
 
             if should_alert:
                 # Send alert
@@ -462,6 +479,7 @@ class Pipeline:
             trigger_spans=detection.trigger_spans or [],
             source_url=event.url,
             published_at=event.published_at,
+            market_impact=detection.llm_reasoning,  # Contains detailed market impact analysis
         )
 
         # Format message for storage

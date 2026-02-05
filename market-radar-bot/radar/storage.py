@@ -592,3 +592,118 @@ def get_stats(db: Session) -> dict:
             select(func.count(AlertSent.id)).where(AlertSent.is_success == True)
         ).scalar(),
     }
+
+
+# =============================================================================
+# Count Functions for Pagination
+# =============================================================================
+
+def count_events(
+    db: Session,
+    processed_only: bool = False,
+    unprocessed_only: bool = False,
+    source_id: Optional[int] = None,
+) -> int:
+    """Count events with optional filtering."""
+    query = select(func.count(Event.id))
+
+    if processed_only:
+        query = query.where(Event.is_processed == True)
+    elif unprocessed_only:
+        query = query.where(Event.is_processed == False)
+
+    if source_id:
+        query = query.where(Event.source_id == source_id)
+
+    return db.execute(query).scalar() or 0
+
+
+def count_alerts(
+    db: Session,
+    success_only: bool = False,
+) -> int:
+    """Count alerts with optional filtering."""
+    query = select(func.count(AlertSent.id))
+
+    if success_only:
+        query = query.where(AlertSent.is_success == True)
+
+    return db.execute(query).scalar() or 0
+
+
+def count_watch_items(
+    db: Session,
+    active_only: bool = False,
+    category: Optional[WatchItemCategory] = None,
+) -> int:
+    """Count watch items with optional filtering."""
+    query = select(func.count(WatchItem.id))
+
+    if active_only:
+        query = query.where(WatchItem.is_active == True)
+
+    if category:
+        query = query.where(WatchItem.category == category)
+
+    return db.execute(query).scalar() or 0
+
+
+def count_sources(
+    db: Session,
+    active_only: bool = False,
+    source_type: Optional[SourceType] = None,
+    global_only: bool = False,
+) -> int:
+    """Count sources with optional filtering."""
+    query = select(func.count(Source.id))
+
+    if active_only:
+        query = query.where(Source.is_active == True)
+
+    if source_type:
+        query = query.where(Source.source_type == source_type)
+
+    if global_only:
+        query = query.where(Source.is_global == True)
+
+    return db.execute(query).scalar() or 0
+
+
+def get_recent_title_hashes(db: Session, hours: int = 24, limit: int = 1000) -> set:
+    """Get title hashes from recent events for near-duplicate detection."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    query = (
+        select(Event.title_hash)
+        .where(Event.fetched_at >= cutoff)
+        .order_by(Event.fetched_at.desc())
+        .limit(limit)
+    )
+    results = db.execute(query).scalars().all()
+    return set(results)
+
+
+def get_recent_alert_titles(
+    db: Session,
+    watch_item_id: int,
+    since: datetime,
+    limit: int = 20,
+) -> List[str]:
+    """Get titles of recent successful alerts for a watch item."""
+    query = (
+        select(Event.title)
+        .select_from(AlertSent)
+        .join(Detection, AlertSent.detection_id == Detection.id)
+        .join(Event, Detection.event_id == Event.id)
+        .where(
+            and_(
+                Detection.watch_item_id == watch_item_id,
+                AlertSent.is_success == True,
+                AlertSent.sent_at >= since,
+            )
+        )
+        .order_by(AlertSent.sent_at.desc())
+        .limit(limit)
+    )
+    results = db.execute(query).scalars().all()
+    return list(results)

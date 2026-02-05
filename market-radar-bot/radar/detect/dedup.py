@@ -5,7 +5,7 @@ Deduplication and cooldown management for events and alerts.
 import hashlib
 import re
 from datetime import datetime, timedelta
-from typing import Optional, Set, List
+from typing import Optional, Set, List, Tuple
 
 import structlog
 from sqlalchemy.orm import Session
@@ -13,6 +13,9 @@ from sqlalchemy.orm import Session
 from radar import storage
 
 logger = structlog.get_logger()
+
+# Threshold for Jaccard similarity to consider as near-duplicate
+TITLE_SIMILARITY_THRESHOLD = 0.7
 
 
 class Deduplicator:
@@ -67,9 +70,62 @@ class Deduplicator:
             logger.debug("duplicate_by_content_hash", hash=content_hash[:16])
             return True
 
-        # For MVP, we rely primarily on content hash
-        # Title hash can be checked for near-duplicates later
+        # Check for near-duplicates by title hash
+        if title_hash:
+            recent_title_hashes = storage.get_recent_title_hashes(db, hours=24)
+            if title_hash in recent_title_hashes:
+                logger.debug("duplicate_by_title_hash", hash=title_hash[:16])
+                return True
+
         return False
+
+    def is_near_duplicate_by_title(
+        self,
+        db: Session,
+        title: str,
+        watch_item_id: int,
+        hours: int = 6,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Check if there's a near-duplicate alert for the same watch item recently.
+        Uses Jaccard similarity to catch paraphrased versions of the same news.
+
+        Args:
+            db: Database session
+            title: The title to check
+            watch_item_id: The watch item ID
+            hours: Look back this many hours
+
+        Returns:
+            Tuple of (is_duplicate, reason)
+        """
+        # Get recent successful alerts for this watch item
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        recent_alerts = storage.get_recent_alert_titles(
+            db,
+            watch_item_id=watch_item_id,
+            since=cutoff,
+            limit=20
+        )
+
+        normalized_title = self.normalize_text(title)
+
+        for recent_title in recent_alerts:
+            normalized_recent = self.normalize_text(recent_title)
+            similarity = self.jaccard_similarity(normalized_title, normalized_recent)
+
+            if similarity >= TITLE_SIMILARITY_THRESHOLD:
+                logger.debug(
+                    "near_duplicate_detected",
+                    similarity=similarity,
+                    title=title[:50],
+                    similar_to=recent_title[:50],
+                )
+                return True, f"Similar to recent alert ({similarity:.0%} match)"
+
+        return False, None
 
     def is_near_duplicate_title(
         self,

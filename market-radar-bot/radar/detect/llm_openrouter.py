@@ -25,6 +25,7 @@ class LLMMatch:
     trigger_spans: List[str]  # Must be exact substrings from source text
     reasoning: str
     assets_affected: List[str] = field(default_factory=list)
+    market_impact: Optional[str] = None  # Detailed explanation of market impact
 
 
 @dataclass
@@ -111,7 +112,7 @@ class OpenRouterClient:
             for w in watch_items
         ])
 
-        prompt = f"""You are a market intelligence analyst. Analyze the following news article and determine if it relates to any of the monitored entities/topics.
+        prompt = f"""You are an expert financial market analyst. Analyze the following news article and determine if it relates to any of the monitored entities/topics.
 
 MONITORED ENTITIES/TOPICS:
 {items_text}
@@ -125,8 +126,11 @@ ARTICLE TEXT:
 TASK:
 1. Determine which monitored entity/topic (if any) this article is most relevant to.
 2. Extract 1-2 EXACT quotes from the article that support this match. These must be EXACT substrings from the article text - do not paraphrase or modify.
-3. Explain briefly why this matters for financial markets.
-4. List any specific assets that might be affected (currencies, commodities, indices, stocks).
+3. Provide a DETAILED market impact analysis explaining:
+   - WHY this news is important for markets
+   - HOW it will affect specific assets (direction: bullish/bearish, short-term vs long-term)
+   - What traders and investors should watch for
+4. List specific assets that will be affected (currencies, commodities, indices, stocks, crypto).
 
 Respond in JSON format:
 {{
@@ -134,15 +138,17 @@ Respond in JSON format:
     "match_name": "<name of matched entity or null>",
     "confidence": <0.0 to 1.0>,
     "citations": ["<exact quote 1>", "<exact quote 2 if relevant>"],
-    "reasoning": "<brief explanation of market relevance>",
-    "assets_affected": ["<asset1>", "<asset2>"]
+    "reasoning": "<brief one-line summary>",
+    "market_impact": "<DETAILED 2-4 sentence explanation of WHY this matters for markets, HOW it affects assets, and WHAT direction (bullish/bearish) for each affected asset. Be specific about which assets go up or down and why.>",
+    "assets_affected": ["<asset1>", "<asset2>", "<asset3>"]
 }}
 
 IMPORTANT:
 - Citations MUST be exact substrings from the article. Do not modify or paraphrase.
 - Only match if there is a clear, direct connection to the monitored entity.
 - If no match is appropriate, return match_id: null.
-- Confidence should reflect how certain you are of the match."""
+- Confidence should reflect how certain you are of the match.
+- The market_impact field is CRITICAL - provide actionable insights for traders."""
 
         return prompt
 
@@ -209,6 +215,7 @@ IMPORTANT:
             confidence = float(data.get("confidence", 0))
             citations = data.get("citations", [])
             reasoning = data.get("reasoning", "")
+            market_impact = data.get("market_impact", "")
             assets_affected = data.get("assets_affected", [])
 
             # If no match, return early
@@ -254,6 +261,7 @@ IMPORTANT:
                 trigger_spans=validated_citations,
                 reasoning=reasoning,
                 assets_affected=assets_affected,
+                market_impact=market_impact or reasoning,  # Fall back to reasoning if no market_impact
             )
 
         except json.JSONDecodeError as e:

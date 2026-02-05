@@ -5,13 +5,16 @@
 {% block content %}
 <div class="flex justify-between items-center mb-4">
     <h1>Sent Alerts</h1>
-    {% if failed_count > 0 %}
-    <form action="/admin/alerts/retry-failed" method="post" style="display: inline;">
-        <button type="submit" class="btn btn-warning">
-            Retry Failed ({{ failed_count }})
-        </button>
-    </form>
-    {% endif %}
+    <div class="flex gap-2 items-center">
+        <span class="text-sm text-muted">Total: {{ total_count }} alerts</span>
+        {% if failed_count > 0 %}
+        <form action="/admin/alerts/retry-failed" method="post" style="display: inline;">
+            <button type="submit" class="btn btn-warning">
+                Retry Failed ({{ failed_count }})
+            </button>
+        </form>
+        {% endif %}
+    </div>
 </div>
 
 {% if message %}
@@ -102,7 +105,39 @@
     </table>
 </div>
 
-<div class="text-sm text-muted">
-    Showing last 100 alerts. Alerts are sent via Telegram when events match watch items with severity >= {{ settings.alert_threshold }}.
+{% if total_pages > 1 %}
+<div class="pagination">
+    <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page > 1 %}
+        <a href="?page=1&per_page={{ per_page }}">&laquo; First</a>
+        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo; Prev</a>
+    {% else %}
+        <span class="disabled">&laquo; First</span>
+        <span class="disabled">&lsaquo; Prev</span>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+        {% if p >= page - 2 and p <= page + 2 %}
+            {% if p == page %}
+                <span class="active">{{ p }}</span>
+            {% else %}
+                <a href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">Next &rsaquo;</a>
+        <a href="?page={{ total_pages }}&per_page={{ per_page }}">Last &raquo;</a>
+    {% else %}
+        <span class="disabled">Next &rsaquo;</span>
+        <span class="disabled">Last &raquo;</span>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="text-sm text-muted text-center mt-2">
+    Showing {{ alerts|length }} of {{ total_count }} alerts. Alerts are sent via Telegram when events match watch items with severity >= {{ settings.alert_threshold }}.
 </div>
 {% endblock %}

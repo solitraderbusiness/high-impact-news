@@ -99,18 +99,35 @@ async def logout(request: Request):
 async def watch_items_list(
     request: Request,
     db: Session = Depends(get_db),
+    page: int = 1,
+    per_page: int = 30,
 ):
-    """List all watch items."""
+    """List all watch items with pagination."""
     session = require_auth_redirect(request)
     if not session:
         return RedirectResponse(url="/admin/login", status_code=302)
 
-    items = storage.get_watch_items(db, limit=500)
+    # Ensure valid pagination
+    page = max(1, page)
+    per_page = min(max(10, per_page), 100)
+    skip = (page - 1) * per_page
+
+    items = storage.get_watch_items(db, skip=skip, limit=per_page)
+    total_count = storage.count_watch_items(db)
+    total_pages = (total_count + per_page - 1) // per_page
     stats = storage.get_stats(db)
 
     return templates.TemplateResponse(
         "watch_items.html",
-        get_context(request, items=items, stats=stats)
+        get_context(
+            request,
+            items=items,
+            stats=stats,
+            page=page,
+            per_page=per_page,
+            total_count=total_count,
+            total_pages=total_pages,
+        )
     )
 
 
@@ -287,17 +304,33 @@ async def watch_item_delete(
 async def sources_list(
     request: Request,
     db: Session = Depends(get_db),
+    page: int = 1,
+    per_page: int = 30,
 ):
-    """List all sources."""
+    """List all sources with pagination."""
     session = require_auth_redirect(request)
     if not session:
         return RedirectResponse(url="/admin/login", status_code=302)
 
-    sources = storage.get_sources(db, limit=500)
+    # Ensure valid pagination
+    page = max(1, page)
+    per_page = min(max(10, per_page), 100)
+    skip = (page - 1) * per_page
+
+    sources = storage.get_sources(db, skip=skip, limit=per_page)
+    total_count = storage.count_sources(db)
+    total_pages = (total_count + per_page - 1) // per_page
 
     return templates.TemplateResponse(
         "sources.html",
-        get_context(request, sources=sources)
+        get_context(
+            request,
+            sources=sources,
+            page=page,
+            per_page=per_page,
+            total_count=total_count,
+            total_pages=total_pages,
+        )
     )
 
 
@@ -450,17 +483,33 @@ async def source_delete(
 async def events_list(
     request: Request,
     db: Session = Depends(get_db),
+    page: int = 1,
+    per_page: int = 30,
 ):
-    """List recent events."""
+    """List recent events with pagination."""
     session = require_auth_redirect(request)
     if not session:
         return RedirectResponse(url="/admin/login", status_code=302)
 
-    events = storage.get_events(db, limit=100)
+    # Ensure valid pagination
+    page = max(1, page)
+    per_page = min(max(10, per_page), 100)  # Between 10 and 100
+    skip = (page - 1) * per_page
+
+    events = storage.get_events(db, skip=skip, limit=per_page)
+    total_count = storage.count_events(db)
+    total_pages = (total_count + per_page - 1) // per_page
 
     return templates.TemplateResponse(
         "events.html",
-        get_context(request, events=events)
+        get_context(
+            request,
+            events=events,
+            page=page,
+            per_page=per_page,
+            total_count=total_count,
+            total_pages=total_pages,
+        )
     )
 
 
@@ -473,18 +522,36 @@ async def alerts_list(
     request: Request,
     db: Session = Depends(get_db),
     message: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 30,
 ):
-    """List sent alerts."""
+    """List sent alerts with pagination."""
     session = require_auth_redirect(request)
     if not session:
         return RedirectResponse(url="/admin/login", status_code=302)
 
-    alerts = storage.get_alerts(db, limit=100)
+    # Ensure valid pagination
+    page = max(1, page)
+    per_page = min(max(10, per_page), 100)
+    skip = (page - 1) * per_page
+
+    alerts = storage.get_alerts(db, skip=skip, limit=per_page)
+    total_count = storage.count_alerts(db)
+    total_pages = (total_count + per_page - 1) // per_page
     failed_count = len([a for a in alerts if not a.is_success])
 
     return templates.TemplateResponse(
         "alerts.html",
-        get_context(request, alerts=alerts, failed_count=failed_count, message=message)
+        get_context(
+            request,
+            alerts=alerts,
+            failed_count=failed_count,
+            message=message,
+            page=page,
+            per_page=per_page,
+            total_count=total_count,
+            total_pages=total_pages,
+        )
     )
 
 
@@ -527,6 +594,7 @@ async def retry_failed_alerts(
             trigger_spans=detection.trigger_spans or [],
             source_url=detection.event.url or "",
             published_at=detection.event.published_at,
+            market_impact=detection.llm_reasoning,
         )
 
         result = notifier.send_alert(alert_data)
@@ -597,6 +665,7 @@ async def retry_single_alert(
         trigger_spans=detection.trigger_spans or [],
         source_url=detection.event.url or "",
         published_at=detection.event.published_at,
+        market_impact=detection.llm_reasoning,
     )
 
     result = notifier.send_alert(alert_data)

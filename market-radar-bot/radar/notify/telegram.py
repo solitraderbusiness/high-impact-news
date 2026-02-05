@@ -30,6 +30,7 @@ class AlertData:
     trigger_spans: List[str]  # Citation quotes
     source_url: str
     published_at: Optional[datetime]
+    market_impact: Optional[str] = None  # Detailed market impact analysis
 
 
 @dataclass
@@ -97,59 +98,97 @@ class TelegramNotifier:
 
     def _format_message(self, data: AlertData) -> str:
         """Format alert data into a Telegram message using HTML with Persian translation."""
-        # Severity emoji
+        # Severity emoji and header based on score
         if data.severity_score >= 90:
             severity_emoji = "🚨"
+            header = "🔴 HIGH IMPACT"
+            bar = "█████████████████"
         elif data.severity_score >= 70:
             severity_emoji = "⚠️"
+            header = "🟠 IMPORTANT"
+            bar = "█████████████░░░░"
         elif data.severity_score >= 50:
             severity_emoji = "📢"
+            header = "🟡 NOTABLE"
+            bar = "█████████░░░░░░░░"
         else:
             severity_emoji = "📌"
+            header = "🔵 INFO"
+            bar = "█████░░░░░░░░░░░░"
 
-        # Format assets
-        assets_text = ", ".join(data.assets_affected) if data.assets_affected else "—"
+        # Format assets with bullet points
+        if data.assets_affected:
+            assets_list = [f"• {asset}" for asset in data.assets_affected[:6]]
+            assets_text = "\n".join(assets_list)
+        else:
+            assets_text = "• Not specified"
 
-        # Try to translate title and quotes to Persian
+        # Try to translate title, quotes, and market impact to Persian
         translator = PersianTranslator()
-        translated = translator.translate(data.title, data.trigger_spans[:2])
+
+        # Include market impact in translation if available
+        texts_to_translate = data.trigger_spans[:1]  # Only translate first quote
+        if data.market_impact:
+            texts_to_translate.append(data.market_impact)
+
+        translated = translator.translate(data.title, texts_to_translate)
 
         # Use translated content if available
         if translated:
             title_text = translated["title"]
-            persian_quotes = translated.get("quotes", [])
+            persian_texts = translated.get("quotes", [])
+            persian_quote = persian_texts[0] if persian_texts else None
+            persian_impact = persian_texts[1] if len(persian_texts) > 1 else None
         else:
             title_text = data.title[:200]
-            persian_quotes = []
+            persian_quote = None
+            persian_impact = None
 
-        # Format citations (Persian first, then English)
-        citations_text = ""
-        for i, span in enumerate(data.trigger_spans[:2]):
-            # Add Persian translation if available
-            if i < len(persian_quotes) and persian_quotes[i]:
-                escaped_fa = self._escape_html(persian_quotes[i])
-                citations_text += f"\n<i>{escaped_fa}</i>"
-            # Add English original
-            escaped_en = self._escape_html(span)
-            citations_text += f"\n<i>({escaped_en})</i>"
+        # Format market impact section (the main info section)
+        info_text = ""
+        if data.market_impact:
+            if persian_impact:
+                escaped_fa_impact = self._escape_html(persian_impact)
+                info_text = f"\n{escaped_fa_impact}"
+            escaped_impact = self._escape_html(data.market_impact)
+            info_text += f"\n\n<i>{escaped_impact}</i>"
+        elif data.trigger_spans:
+            # Fall back to citation if no market impact
+            span = data.trigger_spans[0]
+            if persian_quote:
+                escaped_fa = self._escape_html(persian_quote)
+                info_text = f"\n{escaped_fa}"
+            escaped_en = self._escape_html(span[:300])
+            info_text += f"\n\n<i>{escaped_en}</i>"
 
         # Format timestamp
         timestamp = self._format_timestamp(data.published_at or datetime.utcnow())
 
-        # Build message using HTML (Persian title with English in parentheses)
-        message = f"""{severity_emoji} <b>{self._escape_html(title_text)}</b>
-<i>({self._escape_html(data.title[:200])})</i>
+        # Build message with visual structure
+        message = f"""┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+   {header}
+   {bar} {data.severity_score}%
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-📊 <b>Watch Item:</b> {self._escape_html(data.watch_item_name)}
-📁 <b>Category:</b> {self._escape_html(data.watch_item_category)}
-🎯 <b>Severity:</b> {data.severity_score}/100
-💯 <b>Confidence:</b> {int(data.match_confidence * 100)}%
-💰 <b>Assets:</b> {self._escape_html(assets_text)}
+{severity_emoji} <b>{self._escape_html(title_text)}</b>
 
-📝 <b>Key Quote(s):</b>{citations_text}
+<i>{self._escape_html(data.title[:200])}</i>
 
-🔗 <a href="{data.source_url}">Source</a>
-🕐 {timestamp}"""
+╭───────────────────────────╮
+│ 📊 <b>{self._escape_html(data.watch_item_name)}</b>
+│ 📁 {self._escape_html(data.watch_item_category)}
+│ 💯 Match: {int(data.match_confidence * 100)}%
+╰───────────────────────────╯
+
+💹 <b>Affected Assets:</b>
+{self._escape_html(assets_text)}
+
+💡 <b>Analysis:</b>{info_text}
+
+┌───────────────────────────┐
+│ 🔗 <a href="{data.source_url}">Read Full Article</a>
+│ 🕐 {timestamp}
+└───────────────────────────┘"""
 
         return message
 
