@@ -281,10 +281,15 @@ IMPORTANT:
                         citation=citation[:100],
                     )
 
-            # If no valid citations, we cannot trust this match
+            # If no valid citations but high confidence, use reasoning as trigger span
+            # This allows matches to proceed even when LLM paraphrases slightly
             if not validated_citations:
-                logger.warning("openrouter_no_valid_citations")
-                return None
+                if confidence >= 0.7 and reasoning:
+                    logger.info("openrouter_using_reasoning_as_trigger", confidence=confidence)
+                    validated_citations = [reasoning[:200]]
+                else:
+                    logger.warning("openrouter_no_valid_citations")
+                    return None
 
             return LLMMatch(
                 watch_item_id=match_id,
