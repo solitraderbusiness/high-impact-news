@@ -19,7 +19,7 @@ from radar.detect.rules import RuleMatcher, WatchItemRules
 from radar.detect.llm_openrouter import OpenRouterClient, WatchItemInfo
 from radar.detect.scoring import SeverityScorer
 from radar.detect.dedup import Deduplicator
-from radar.notify.telegram import TelegramNotifier, AlertData
+from radar.notify.telegram import TelegramNotifier, AlertData, AssetWithDirection
 from radar.schemas import CollectionResult, DetectionResult, PipelineRunResult
 from radar.learning import (
     ImpactTracker,
@@ -331,6 +331,7 @@ class Pipeline:
                                 'trigger_spans': llm_match.trigger_spans,
                                 'llm_reasoning': llm_match.reasoning,
                                 'assets_affected': llm_match.assets_affected,
+                                'assets_with_impact': getattr(llm_match, 'assets_with_impact', []),
                                 'market_impact': getattr(llm_match, 'market_impact', None),
                             })()
                             match_method = "llm"
@@ -382,6 +383,7 @@ class Pipeline:
         llm_reasoning = market_impact or llm_reasoning
         assets_from_match = getattr(best_match, 'assets_affected', None)
         assets_affected = assets_from_match or watch_item.assets_affected or []
+        assets_with_impact = getattr(best_match, 'assets_with_impact', [])
 
         # Create detection record
         detection = storage.create_detection(
@@ -422,7 +424,7 @@ class Pipeline:
 
             if should_alert:
                 # Send alert
-                alert_result = self._send_alert(db, event, detection, watch_item)
+                alert_result = self._send_alert(db, event, detection, watch_item, assets_with_impact)
                 is_alerted = alert_result
             else:
                 # Suppress
@@ -467,8 +469,17 @@ class Pipeline:
         event: Event,
         detection,
         watch_item: WatchItem,
+        assets_with_impact: list = None,
     ) -> bool:
         """Send alert and record result."""
+        # Convert assets_with_impact to AssetWithDirection objects
+        assets_with_direction = None
+        if assets_with_impact:
+            assets_with_direction = [
+                AssetWithDirection(symbol=a.symbol, direction=a.direction)
+                for a in assets_with_impact
+            ]
+
         alert_data = AlertData(
             title=event.title,
             watch_item_name=watch_item.name,
@@ -480,6 +491,7 @@ class Pipeline:
             source_url=event.url,
             published_at=event.published_at,
             market_impact=detection.llm_reasoning,  # Contains detailed market impact analysis
+            assets_with_direction=assets_with_direction,
         )
 
         # Format message for storage

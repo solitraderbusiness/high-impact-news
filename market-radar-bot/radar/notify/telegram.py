@@ -19,6 +19,13 @@ logger = structlog.get_logger()
 
 
 @dataclass
+class AssetWithDirection:
+    """An asset with its expected price direction."""
+    symbol: str
+    direction: str  # "bullish", "bearish", or "neutral"
+
+
+@dataclass
 class AlertData:
     """Data for a Telegram alert."""
     title: str
@@ -31,6 +38,7 @@ class AlertData:
     source_url: str
     published_at: Optional[datetime]
     market_impact: Optional[str] = None  # Detailed market impact analysis
+    assets_with_direction: Optional[List[AssetWithDirection]] = None  # Assets with bullish/bearish direction
 
 
 @dataclass
@@ -116,18 +124,14 @@ class TelegramNotifier:
             header = "🔵 INFO"
             bar = "█████░░░░░░░░░░░░"
 
-        # Format assets with bullet points
-        if data.assets_affected:
-            assets_list = [f"• {asset}" for asset in data.assets_affected[:6]]
-            assets_text = "\n".join(assets_list)
-        else:
-            assets_text = "• Not specified"
+        # Format assets with direction arrows
+        assets_text = self._format_assets_with_direction(data)
 
-        # Try to translate title, quotes, and market impact to Persian
+        # Try to translate title and market impact to Persian
         translator = PersianTranslator()
 
         # Include market impact in translation if available
-        texts_to_translate = data.trigger_spans[:1]  # Only translate first quote
+        texts_to_translate = []
         if data.market_impact:
             texts_to_translate.append(data.market_impact)
 
@@ -137,11 +141,9 @@ class TelegramNotifier:
         if translated:
             title_text = translated["title"]
             persian_texts = translated.get("quotes", [])
-            persian_quote = persian_texts[0] if persian_texts else None
-            persian_impact = persian_texts[1] if len(persian_texts) > 1 else None
+            persian_impact = persian_texts[0] if persian_texts else None
         else:
             title_text = data.title[:200]
-            persian_quote = None
             persian_impact = None
 
         # Format market impact section (the main info section)
@@ -152,45 +154,52 @@ class TelegramNotifier:
                 info_text = f"\n{escaped_fa_impact}"
             escaped_impact = self._escape_html(data.market_impact)
             info_text += f"\n\n<i>{escaped_impact}</i>"
-        elif data.trigger_spans:
-            # Fall back to citation if no market impact
-            span = data.trigger_spans[0]
-            if persian_quote:
-                escaped_fa = self._escape_html(persian_quote)
-                info_text = f"\n{escaped_fa}"
-            escaped_en = self._escape_html(span[:300])
-            info_text += f"\n\n<i>{escaped_en}</i>"
+        else:
+            info_text = "\n<i>No detailed analysis available</i>"
 
         # Format timestamp
         timestamp = self._format_timestamp(data.published_at or datetime.utcnow())
 
-        # Build message with visual structure
-        message = f"""┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-   {header}
-   {bar} {data.severity_score}%
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+        # Build message with cleaner visual structure
+        message = f"""{header}
+{bar} {data.severity_score}%
 
 {severity_emoji} <b>{self._escape_html(title_text)}</b>
 
 <i>{self._escape_html(data.title[:200])}</i>
 
-╭───────────────────────────╮
-│ 📊 <b>{self._escape_html(data.watch_item_name)}</b>
-│ 📁 {self._escape_html(data.watch_item_category)}
-│ 💯 Match: {int(data.match_confidence * 100)}%
-╰───────────────────────────╯
+📊 <b>{self._escape_html(data.watch_item_name)}</b> • {self._escape_html(data.watch_item_category)}
+💯 Match: {int(data.match_confidence * 100)}%
 
 💹 <b>Affected Assets:</b>
-{self._escape_html(assets_text)}
+{assets_text}
 
 💡 <b>Analysis:</b>{info_text}
 
-┌───────────────────────────┐
-│ 🔗 <a href="{data.source_url}">Read Full Article</a>
-│ 🕐 {timestamp}
-└───────────────────────────┘"""
+🔗 <a href="{data.source_url}">Read Full Article</a>
+🕐 {timestamp}"""
 
         return message
+
+    def _format_assets_with_direction(self, data: AlertData) -> str:
+        """Format assets with direction arrows (↑ bullish, ↓ bearish)."""
+        if data.assets_with_direction:
+            lines = []
+            for asset in data.assets_with_direction[:6]:
+                if asset.direction == "bullish":
+                    arrow = "📈"
+                elif asset.direction == "bearish":
+                    arrow = "📉"
+                else:
+                    arrow = "➖"
+                lines.append(f"{arrow} {self._escape_html(asset.symbol)}")
+            return "\n".join(lines)
+        elif data.assets_affected:
+            # Fallback to old format without direction
+            assets_list = [f"• {self._escape_html(asset)}" for asset in data.assets_affected[:6]]
+            return "\n".join(assets_list)
+        else:
+            return "• Not specified"
 
     def _format_timestamp(self, dt: datetime) -> str:
         """Format timestamp with UTC and configured local timezone."""

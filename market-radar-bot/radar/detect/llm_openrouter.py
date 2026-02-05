@@ -17,6 +17,13 @@ logger = structlog.get_logger()
 
 
 @dataclass
+class AssetImpact:
+    """An asset with its expected direction."""
+    symbol: str
+    direction: str  # "bullish", "bearish", or "neutral"
+
+
+@dataclass
 class LLMMatch:
     """Result of an LLM-based match."""
     watch_item_id: Optional[int]  # None if no match
@@ -25,6 +32,7 @@ class LLMMatch:
     trigger_spans: List[str]  # Must be exact substrings from source text
     reasoning: str
     assets_affected: List[str] = field(default_factory=list)
+    assets_with_impact: List[AssetImpact] = field(default_factory=list)  # Assets with direction
     market_impact: Optional[str] = None  # Detailed explanation of market impact
 
 
@@ -127,10 +135,10 @@ TASK:
 1. Determine which monitored entity/topic (if any) this article is most relevant to.
 2. Extract 1-2 EXACT quotes from the article that support this match. These must be EXACT substrings from the article text - do not paraphrase or modify.
 3. Provide a DETAILED market impact analysis explaining:
-   - WHY this news is important for markets
-   - HOW it will affect specific assets (direction: bullish/bearish, short-term vs long-term)
+   - WHY this news is important for markets (not just what the news says)
+   - HOW it will affect specific assets and in what direction
    - What traders and investors should watch for
-4. List specific assets that will be affected (currencies, commodities, indices, stocks, crypto).
+4. List specific assets with their expected direction (bullish/bearish).
 
 Respond in JSON format:
 {{
@@ -139,8 +147,12 @@ Respond in JSON format:
     "confidence": <0.0 to 1.0>,
     "citations": ["<exact quote 1>", "<exact quote 2 if relevant>"],
     "reasoning": "<brief one-line summary>",
-    "market_impact": "<DETAILED 2-4 sentence explanation of WHY this matters for markets, HOW it affects assets, and WHAT direction (bullish/bearish) for each affected asset. Be specific about which assets go up or down and why.>",
-    "assets_affected": ["<asset1>", "<asset2>", "<asset3>"]
+    "market_impact": "<DETAILED 2-4 sentence explanation of WHY this news matters for markets. Explain the cause and effect: what is happening, why it's significant, and what the likely market reaction will be. Do NOT repeat the headline - explain the IMPLICATIONS.>",
+    "assets_with_impact": [
+        {{"symbol": "EUR", "direction": "bearish"}},
+        {{"symbol": "EURUSD", "direction": "bearish"}},
+        {{"symbol": "German Bunds", "direction": "bullish"}}
+    ]
 }}
 
 IMPORTANT:
@@ -148,7 +160,8 @@ IMPORTANT:
 - Only match if there is a clear, direct connection to the monitored entity.
 - If no match is appropriate, return match_id: null.
 - Confidence should reflect how certain you are of the match.
-- The market_impact field is CRITICAL - provide actionable insights for traders."""
+- The market_impact field is CRITICAL - explain WHY and HOW, don't just repeat the headline.
+- For assets_with_impact, use "bullish" for assets expected to rise, "bearish" for those expected to fall, "neutral" if uncertain."""
 
         return prompt
 
@@ -216,7 +229,26 @@ IMPORTANT:
             citations = data.get("citations", [])
             reasoning = data.get("reasoning", "")
             market_impact = data.get("market_impact", "")
-            assets_affected = data.get("assets_affected", [])
+
+            # Parse assets with impact direction
+            assets_with_impact_raw = data.get("assets_with_impact", [])
+            assets_with_impact = []
+            assets_affected = []
+
+            for asset_data in assets_with_impact_raw:
+                if isinstance(asset_data, dict):
+                    symbol = asset_data.get("symbol", "")
+                    direction = asset_data.get("direction", "neutral")
+                    if symbol:
+                        assets_with_impact.append(AssetImpact(symbol=symbol, direction=direction))
+                        assets_affected.append(symbol)
+                elif isinstance(asset_data, str):
+                    # Fallback for old format
+                    assets_affected.append(asset_data)
+
+            # Fallback to old assets_affected format if no assets_with_impact
+            if not assets_affected:
+                assets_affected = data.get("assets_affected", [])
 
             # If no match, return early
             if match_id is None:
@@ -261,6 +293,7 @@ IMPORTANT:
                 trigger_spans=validated_citations,
                 reasoning=reasoning,
                 assets_affected=assets_affected,
+                assets_with_impact=assets_with_impact,
                 market_impact=market_impact or reasoning,  # Fall back to reasoning if no market_impact
             )
 
