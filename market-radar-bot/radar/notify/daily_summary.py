@@ -187,26 +187,120 @@ class DailySummaryGenerator:
 
                 # Try to infer direction from llm_reasoning
                 if detection.llm_reasoning:
-                    reasoning_lower = detection.llm_reasoning.lower()
-                    asset_lower = asset.lower()
-
-                    # Check for direction hints near asset mention
-                    if asset_lower in reasoning_lower:
-                        # Look for bullish/bearish keywords near the asset
-                        if any(word in reasoning_lower for word in
-                               ["bullish " + asset_lower, asset_lower + " rise",
-                                asset_lower + " gain", asset_lower + " rally",
-                                "boost " + asset_lower, asset_lower + " up"]):
-                            direction = "bullish"
-                        elif any(word in reasoning_lower for word in
-                                 ["bearish " + asset_lower, asset_lower + " fall",
-                                  asset_lower + " drop", asset_lower + " decline",
-                                  "weigh on " + asset_lower, asset_lower + " down"]):
-                            direction = "bearish"
+                    direction = self._detect_asset_direction(
+                        detection.llm_reasoning,
+                        asset
+                    )
 
                 results.append((asset, direction))
 
         return results
+
+    def _detect_asset_direction(self, text: str, asset: str) -> str:
+        """
+        Detect bullish/bearish direction for an asset from analysis text.
+        Uses flexible pattern matching to find sentiment near asset mentions.
+        """
+        import re
+
+        text_lower = text.lower()
+        asset_lower = asset.lower()
+
+        # Bullish keywords and phrases
+        bullish_keywords = [
+            'bullish', 'positive', 'strengthen', 'rise', 'rally', 'gain',
+            'boost', 'support', 'higher', 'upward', 'increase', 'advance',
+            'benefit', 'favorable', 'strong', 'robust', 'optimistic',
+            'appreciation', 'soar', 'surge', 'climb', 'lift', 'upside',
+        ]
+
+        # Bearish keywords and phrases
+        bearish_keywords = [
+            'bearish', 'negative', 'weaken', 'fall', 'drop', 'decline',
+            'pressure', 'lower', 'downward', 'decrease', 'sell-off',
+            'unfavorable', 'weak', 'pessimistic', 'depreciation', 'slide',
+            'sink', 'plunge', 'drag', 'downside', 'risk', 'hurt',
+        ]
+
+        # Find all positions where the asset is mentioned
+        asset_positions = [m.start() for m in re.finditer(re.escape(asset_lower), text_lower)]
+
+        if not asset_positions:
+            # Asset not directly mentioned, check for general sentiment
+            return "neutral"
+
+        bullish_score = 0
+        bearish_score = 0
+
+        # Check context around each asset mention (within ~100 chars)
+        for pos in asset_positions:
+            # Get surrounding context
+            start = max(0, pos - 100)
+            end = min(len(text_lower), pos + len(asset_lower) + 100)
+            context = text_lower[start:end]
+
+            # Count sentiment keywords in context
+            for keyword in bullish_keywords:
+                if keyword in context:
+                    bullish_score += 1
+
+            for keyword in bearish_keywords:
+                if keyword in context:
+                    bearish_score += 1
+
+        # Also check for common patterns anywhere in text
+        bullish_patterns = [
+            f"bullish for {asset_lower}",
+            f"bullish on {asset_lower}",
+            f"positive for {asset_lower}",
+            f"{asset_lower} strength",
+            f"{asset_lower} could rise",
+            f"{asset_lower} may rise",
+            f"{asset_lower} likely to rise",
+            f"support {asset_lower}",
+            f"supports {asset_lower}",
+            f"boost {asset_lower}",
+            f"boosts {asset_lower}",
+            f"lift {asset_lower}",
+            f"lifts {asset_lower}",
+            f"{asset_lower} rally",
+            f"{asset_lower} gains",
+            f"{asset_lower} higher",
+        ]
+
+        bearish_patterns = [
+            f"bearish for {asset_lower}",
+            f"bearish on {asset_lower}",
+            f"negative for {asset_lower}",
+            f"{asset_lower} weakness",
+            f"{asset_lower} could fall",
+            f"{asset_lower} may fall",
+            f"{asset_lower} likely to fall",
+            f"pressure on {asset_lower}",
+            f"weigh on {asset_lower}",
+            f"weighs on {asset_lower}",
+            f"drag on {asset_lower}",
+            f"drags on {asset_lower}",
+            f"{asset_lower} decline",
+            f"{asset_lower} drops",
+            f"{asset_lower} lower",
+        ]
+
+        for pattern in bullish_patterns:
+            if pattern in text_lower:
+                bullish_score += 2  # Direct patterns get more weight
+
+        for pattern in bearish_patterns:
+            if pattern in text_lower:
+                bearish_score += 2
+
+        # Determine direction based on scores
+        if bullish_score > bearish_score and bullish_score >= 2:
+            return "bullish"
+        elif bearish_score > bullish_score and bearish_score >= 2:
+            return "bearish"
+        else:
+            return "neutral"
 
     def _fetch_price_changes(self, assets: Dict[str, AssetSentiment]) -> None:
         """Fetch 24h price changes for assets."""
