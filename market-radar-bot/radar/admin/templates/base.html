@@ -388,13 +388,242 @@
             background: #dbeafe;
             color: #1e40af;
         }
+
+        /* Mobile hamburger menu */
+        .nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            /* Navigation */
+            nav {
+                padding: 0.75rem 1rem;
+            }
+
+            nav .nav-content {
+                flex-wrap: wrap;
+            }
+
+            .nav-toggle {
+                display: block;
+            }
+
+            nav .nav-links {
+                display: none;
+                width: 100%;
+                flex-direction: column;
+                gap: 0;
+                margin-top: 1rem;
+                padding-top: 1rem;
+                border-top: 1px solid var(--gray-700);
+            }
+
+            nav .nav-links.active {
+                display: flex;
+            }
+
+            nav .nav-links a {
+                padding: 0.75rem 0;
+                border-bottom: 1px solid var(--gray-700);
+            }
+
+            nav .nav-links a:last-child {
+                border-bottom: none;
+            }
+
+            /* Container */
+            .container {
+                padding: 0 0.75rem;
+            }
+
+            /* Cards */
+            .card {
+                padding: 1rem;
+                margin-bottom: 1rem;
+                border-radius: 0.375rem;
+            }
+
+            .card h2 {
+                font-size: 1.1rem;
+            }
+
+            /* Tables - horizontal scroll */
+            .card {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 600px;
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.5rem 0.4rem;
+            }
+
+            .truncate {
+                max-width: 150px;
+            }
+
+            /* Stats grid */
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+
+            .stat-card {
+                padding: 0.75rem;
+            }
+
+            .stat-value {
+                font-size: 1.25rem;
+            }
+
+            .stat-label {
+                font-size: 0.65rem;
+            }
+
+            /* Buttons */
+            .btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+            }
+
+            .btn-sm {
+                padding: 0.3rem 0.5rem;
+                font-size: 0.7rem;
+            }
+
+            /* Forms */
+            .form-group {
+                margin-bottom: 0.75rem;
+            }
+
+            input[type="text"],
+            input[type="password"],
+            input[type="number"],
+            input[type="url"],
+            select,
+            textarea {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 0.6rem;
+            }
+
+            /* Settings page tables */
+            .card table {
+                min-width: auto;
+            }
+
+            .card table td {
+                display: block;
+                padding: 0.4rem 0;
+                border-bottom: none;
+            }
+
+            .card table tr {
+                display: block;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid var(--gray-200);
+            }
+
+            .card table td:first-child {
+                font-weight: 600;
+            }
+
+            .card table td:last-child {
+                font-size: 0.75rem;
+                color: var(--gray-500);
+            }
+
+            .card table input,
+            .card table select {
+                width: 100% !important;
+                margin-top: 0.25rem;
+            }
+
+            /* Pagination */
+            .pagination {
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
+
+            .pagination a, .pagination span {
+                min-width: 2rem;
+                height: 2rem;
+                padding: 0 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            .pagination-info {
+                width: 100%;
+                text-align: center;
+                margin-bottom: 0.5rem;
+                margin-right: 0;
+            }
+
+            /* Flex utilities */
+            .flex {
+                flex-wrap: wrap;
+            }
+
+            .justify-between {
+                gap: 0.5rem;
+            }
+
+            /* Page headers */
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            /* Alerts */
+            .alert {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            /* Hide some columns on very small screens */
+            .hide-mobile {
+                display: none;
+            }
+        }
+
+        /* Extra small screens */
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            table {
+                font-size: 0.75rem;
+            }
+
+            th, td {
+                padding: 0.4rem 0.3rem;
+            }
+
+            .truncate {
+                max-width: 120px;
+            }
+
+            h1 {
+                font-size: 1.25rem;
+            }
+        }
     </style>
 </head>
 <body>
     <nav>
         <div class="nav-content">
             <a href="/admin/" class="brand">Market Radar</a>
-            <div class="nav-links">
+            <button class="nav-toggle" onclick="toggleNav()" aria-label="Toggle navigation">☰</button>
+            <div class="nav-links" id="navLinks">
                 <a href="/admin/watch-items" {% if request.url.path == '/admin/watch-items' %}class="active"{% endif %}>Watch Items</a>
                 <a href="/admin/sources" {% if request.url.path == '/admin/sources' %}class="active"{% endif %}>Sources</a>
                 <a href="/admin/events" {% if request.url.path == '/admin/events' %}class="active"{% endif %}>Events</a>
@@ -410,6 +639,30 @@
         {% block content %}{% endblock %}
     </main>
 
+    <script>
+        function toggleNav() {
+            const navLinks = document.getElementById('navLinks');
+            navLinks.classList.toggle('active');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const nav = document.querySelector('nav');
+            const navLinks = document.getElementById('navLinks');
+            const toggle = document.querySelector('.nav-toggle');
+
+            if (!nav.contains(event.target) && navLinks.classList.contains('active')) {
+                navLinks.classList.remove('active');
+            }
+        });
+
+        // Close menu when clicking a link
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', () => {
+                document.getElementById('navLinks').classList.remove('active');
+            });
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
