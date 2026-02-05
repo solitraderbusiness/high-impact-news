@@ -728,6 +728,7 @@ async def settings_page(
 
     settings = get_settings()
     stats = storage.get_stats(db)
+    db_settings = storage.get_all_app_settings(db)
 
     return templates.TemplateResponse(
         "settings.html",
@@ -735,8 +736,52 @@ async def settings_page(
             request,
             current_settings=settings,
             stats=stats,
+            db_settings=db_settings,
             message=message,
         )
+    )
+
+
+@router.post("/settings/save")
+async def save_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    alert_threshold: int = Form(...),
+    digest_threshold: int = Form(...),
+    poll_interval_seconds: int = Form(...),
+    default_cooldown_minutes: int = Form(...),
+    llm_confidence_threshold: float = Form(...),
+    openrouter_model: str = Form(...),
+    openrouter_api_key: str = Form(""),
+    telegram_bot_token: str = Form(""),
+    telegram_chat_id: str = Form(""),
+):
+    """Save settings to database."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Save detection/alert settings
+    storage.set_app_setting(db, "alert_threshold", str(alert_threshold), "Severity threshold for immediate alerts")
+    storage.set_app_setting(db, "digest_threshold", str(digest_threshold), "Severity threshold for digest inclusion")
+    storage.set_app_setting(db, "poll_interval_seconds", str(poll_interval_seconds), "How often to poll sources")
+    storage.set_app_setting(db, "default_cooldown_minutes", str(default_cooldown_minutes), "Cooldown between alerts")
+    storage.set_app_setting(db, "llm_confidence_threshold", str(llm_confidence_threshold), "Min LLM confidence")
+
+    # Save LLM settings
+    storage.set_app_setting(db, "openrouter_model", openrouter_model, "OpenRouter model to use")
+    if openrouter_api_key:  # Only update if provided
+        storage.set_app_setting(db, "openrouter_api_key", openrouter_api_key, "OpenRouter API key")
+
+    # Save Telegram settings
+    if telegram_bot_token:  # Only update if provided
+        storage.set_app_setting(db, "telegram_bot_token", telegram_bot_token, "Telegram bot token")
+    if telegram_chat_id:
+        storage.set_app_setting(db, "telegram_chat_id", telegram_chat_id, "Telegram channel/chat ID")
+
+    return RedirectResponse(
+        url="/admin/settings?message=Settings+saved+successfully!+Restart+service+to+apply.",
+        status_code=302
     )
 
 

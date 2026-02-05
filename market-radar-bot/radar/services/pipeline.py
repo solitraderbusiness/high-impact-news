@@ -8,7 +8,7 @@ from typing import List, Optional
 import structlog
 from sqlalchemy.orm import Session
 
-from radar.config import get_settings
+from radar.config import get_settings, get_settings_with_db_overrides
 from radar.db import get_db_context
 from radar import storage
 from radar.models import Source, WatchItem, Event, SourceType, SourceTier
@@ -80,6 +80,15 @@ class Pipeline:
 
         try:
             with get_db_context() as db:
+                # Refresh settings from database
+                db_settings = storage.get_all_app_settings(db)
+                if db_settings:
+                    self.settings = get_settings_with_db_overrides(db_settings)
+                    # Reinitialize components with new settings
+                    self.notifier = TelegramNotifier(settings=self.settings)
+                    self.llm_client = OpenRouterClient(settings=self.settings)
+                    logger.debug("settings_refreshed_from_db", keys=list(db_settings.keys()))
+
                 # Step 1: Collect from all sources
                 collection_results, new_events = self._collect_all(db)
 

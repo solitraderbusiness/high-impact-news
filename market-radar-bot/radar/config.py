@@ -124,3 +124,64 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+def get_settings_with_db_overrides(db_settings: dict) -> Settings:
+    """
+    Get settings with database overrides applied.
+
+    Args:
+        db_settings: Dictionary of settings from database (key -> value strings)
+
+    Returns:
+        Settings instance with database values overriding env values
+    """
+    base = get_settings()
+
+    # Create a copy of settings as dict
+    settings_dict = {
+        "database_url": base.database_url,
+        "admin_username": base.admin_username,
+        "admin_password": base.admin_password,
+        "secret_key": base.secret_key,
+        "telegram_bot_token": db_settings.get("telegram_bot_token") or base.telegram_bot_token,
+        "telegram_chat_id": db_settings.get("telegram_chat_id") or base.telegram_chat_id,
+        "openrouter_api_key": db_settings.get("openrouter_api_key") or base.openrouter_api_key,
+        "openrouter_model": db_settings.get("openrouter_model", base.openrouter_model),
+        "openrouter_base_url": base.openrouter_base_url,
+        "alert_threshold": int(db_settings.get("alert_threshold", base.alert_threshold)),
+        "digest_threshold": int(db_settings.get("digest_threshold", base.digest_threshold)),
+        "llm_confidence_threshold": float(db_settings.get("llm_confidence_threshold", base.llm_confidence_threshold)),
+        "poll_interval_seconds": int(db_settings.get("poll_interval_seconds", base.poll_interval_seconds)),
+        "default_cooldown_minutes": int(db_settings.get("default_cooldown_minutes", base.default_cooldown_minutes)),
+        "max_text_length": base.max_text_length,
+        "log_level": base.log_level,
+        "log_format": base.log_format,
+        "host": base.host,
+        "port": base.port,
+        "timezone": base.timezone,
+    }
+
+    return Settings(**settings_dict)
+
+
+def get_db_setting(db, key: str, default=None):
+    """
+    Get a single setting value, checking database first, then env.
+
+    Args:
+        db: Database session
+        key: Setting key
+        default: Default value if not found
+
+    Returns:
+        Setting value
+    """
+    from radar.storage import get_app_setting
+
+    db_value = get_app_setting(db, key)
+    if db_value is not None:
+        return db_value
+
+    base = get_settings()
+    return getattr(base, key, default)

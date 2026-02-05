@@ -52,8 +52,8 @@ class OpenRouterClient:
     Analyzes text to match against watch items when rules are insufficient.
     """
 
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, settings=None):
+        self.settings = settings or get_settings()
         self.timeout = httpx.Timeout(60.0)
 
     @property

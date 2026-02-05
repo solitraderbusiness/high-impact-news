@@ -55,8 +55,8 @@ class TelegramNotifier:
     Sends alerts via Telegram Bot API with retry logic.
     """
 
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, settings=None):
+        self.settings = settings or get_settings()
         self.timeout = httpx.Timeout(30.0)
         self.max_retries = 3
         self.retry_delays = [2, 4, 8]  # Exponential backoff

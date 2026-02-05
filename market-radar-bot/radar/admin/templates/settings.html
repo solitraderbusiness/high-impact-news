@@ -8,7 +8,7 @@
 </div>
 
 {% if message %}
-<div class="alert {% if 'success' in message.lower() or 'sent' in message.lower() %}alert-success{% else %}alert-warning{% endif %}">
+<div class="alert {% if 'success' in message.lower() or 'saved' in message.lower() or 'sent' in message.lower() %}alert-success{% else %}alert-warning{% endif %}">
     {{ message }}
 </div>
 {% endif %}
@@ -36,119 +36,176 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>Current Configuration</h2>
-    <p class="text-sm text-muted mb-4">
-        These settings are configured via environment variables. Update your .env file to change them.
-    </p>
+<!-- Editable Settings Form -->
+<form method="POST" action="/admin/settings/save">
+    <div class="card">
+        <h2>Detection & Alert Settings</h2>
+        <p class="text-sm text-muted mb-4">
+            These settings control how news is detected and when alerts are sent.
+        </p>
 
-    <table>
-        <tbody>
-            <tr>
-                <td><strong>Alert Threshold</strong></td>
-                <td>{{ current_settings.alert_threshold }}</td>
-                <td class="text-sm text-muted">Severity score (0-100) above which immediate alerts are sent</td>
-            </tr>
-            <tr>
-                <td><strong>Digest Threshold</strong></td>
-                <td>{{ current_settings.digest_threshold }}</td>
-                <td class="text-sm text-muted">Severity score for digest inclusion</td>
-            </tr>
-            <tr>
-                <td><strong>Poll Interval</strong></td>
-                <td>{{ current_settings.poll_interval_seconds }} seconds</td>
-                <td class="text-sm text-muted">How often sources are polled</td>
-            </tr>
-            <tr>
-                <td><strong>Default Cooldown</strong></td>
-                <td>{{ current_settings.default_cooldown_minutes }} minutes</td>
-                <td class="text-sm text-muted">Time between alerts for same watch item</td>
-            </tr>
-            <tr>
-                <td><strong>LLM Confidence Threshold</strong></td>
-                <td>{{ current_settings.llm_confidence_threshold }}</td>
-                <td class="text-sm text-muted">Minimum confidence for LLM matches</td>
-            </tr>
-            <tr>
-                <td><strong>Max Text Length</strong></td>
-                <td>{{ current_settings.max_text_length }} chars</td>
-                <td class="text-sm text-muted">Maximum stored text per event</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width: 200px;"><strong>Alert Threshold</strong></td>
+                    <td style="width: 150px;">
+                        <input type="number" name="alert_threshold"
+                               value="{{ db_settings.get('alert_threshold', current_settings.alert_threshold) }}"
+                               min="0" max="100" class="form-input" style="width: 80px;">
+                    </td>
+                    <td class="text-sm text-muted">Severity score (0-100) above which immediate alerts are sent</td>
+                </tr>
+                <tr>
+                    <td><strong>Digest Threshold</strong></td>
+                    <td>
+                        <input type="number" name="digest_threshold"
+                               value="{{ db_settings.get('digest_threshold', current_settings.digest_threshold) }}"
+                               min="0" max="100" class="form-input" style="width: 80px;">
+                    </td>
+                    <td class="text-sm text-muted">Severity score for digest inclusion</td>
+                </tr>
+                <tr>
+                    <td><strong>Poll Interval</strong></td>
+                    <td>
+                        <input type="number" name="poll_interval_seconds"
+                               value="{{ db_settings.get('poll_interval_seconds', current_settings.poll_interval_seconds) }}"
+                               min="10" max="3600" class="form-input" style="width: 80px;"> sec
+                    </td>
+                    <td class="text-sm text-muted">How often sources are polled (minimum 10 seconds)</td>
+                </tr>
+                <tr>
+                    <td><strong>Default Cooldown</strong></td>
+                    <td>
+                        <input type="number" name="default_cooldown_minutes"
+                               value="{{ db_settings.get('default_cooldown_minutes', current_settings.default_cooldown_minutes) }}"
+                               min="1" max="1440" class="form-input" style="width: 80px;"> min
+                    </td>
+                    <td class="text-sm text-muted">Time between alerts for same watch item</td>
+                </tr>
+                <tr>
+                    <td><strong>LLM Confidence</strong></td>
+                    <td>
+                        <input type="number" name="llm_confidence_threshold"
+                               value="{{ db_settings.get('llm_confidence_threshold', current_settings.llm_confidence_threshold) }}"
+                               min="0" max="1" step="0.05" class="form-input" style="width: 80px;">
+                    </td>
+                    <td class="text-sm text-muted">Minimum confidence for LLM matches (0.0-1.0)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>LLM Configuration</h2>
+        <p class="text-sm text-muted mb-4">
+            Configure the AI model used for news analysis.
+        </p>
+
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width: 200px;"><strong>OpenRouter Model</strong></td>
+                    <td>
+                        <select name="openrouter_model" class="form-input" style="width: 300px;">
+                            {% set current_model = db_settings.get('openrouter_model', current_settings.openrouter_model) %}
+                            <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku (Fast, Cheap)</option>
+                            <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet (Balanced)</option>
+                            <option value="anthropic/claude-3-opus" {% if current_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus (Best Quality)</option>
+                            <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini (Fast)</option>
+                            <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o (High Quality)</option>
+                            <option value="google/gemini-pro" {% if current_model == 'google/gemini-pro' %}selected{% endif %}>Gemini Pro</option>
+                            <option value="meta-llama/llama-3-70b-instruct" {% if current_model == 'meta-llama/llama-3-70b-instruct' %}selected{% endif %}>Llama 3 70B</option>
+                        </select>
+                    </td>
+                    <td class="text-sm text-muted">AI model for analyzing news relevance</td>
+                </tr>
+                <tr>
+                    <td><strong>OpenRouter API Key</strong></td>
+                    <td>
+                        <input type="password" name="openrouter_api_key"
+                               value="{{ db_settings.get('openrouter_api_key', '') }}"
+                               placeholder="sk-or-..." class="form-input" style="width: 300px;">
+                    </td>
+                    <td class="text-sm text-muted">Leave empty to keep current key</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Telegram Configuration</h2>
+        <p class="text-sm text-muted mb-4">
+            Configure where alerts are sent.
+        </p>
+
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width: 200px;"><strong>Bot Token</strong></td>
+                    <td>
+                        <input type="password" name="telegram_bot_token"
+                               value="{{ db_settings.get('telegram_bot_token', '') }}"
+                               placeholder="123456:ABC-DEF..." class="form-input" style="width: 300px;">
+                    </td>
+                    <td class="text-sm text-muted">Telegram bot token from @BotFather</td>
+                </tr>
+                <tr>
+                    <td><strong>Channel/Chat ID</strong></td>
+                    <td>
+                        <input type="text" name="telegram_chat_id"
+                               value="{{ db_settings.get('telegram_chat_id', '') }}"
+                               placeholder="-100123456789 or @channelname" class="form-input" style="width: 300px;">
+                    </td>
+                    <td class="text-sm text-muted">Channel ID (starts with -100) or @username</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <span class="text-sm text-muted" style="line-height: 36px;">Changes take effect after service restart</span>
+    </div>
+</form>
 
 <div class="card">
     <h2>Integration Status</h2>
     <table>
         <tbody>
             <tr>
-                <td><strong>Telegram</strong></td>
+                <td style="width: 200px;"><strong>Telegram</strong></td>
                 <td>
-                    {% if current_settings.has_telegram %}
+                    {% if current_settings.has_telegram or db_settings.get('telegram_bot_token') %}
                         <span class="badge badge-success">Configured</span>
                     {% else %}
                         <span class="badge badge-warning">Not Configured</span>
                     {% endif %}
                 </td>
                 <td>
-                    {% if current_settings.has_telegram %}
+                    {% if current_settings.has_telegram or db_settings.get('telegram_bot_token') %}
                         <form method="POST" action="/admin/settings/test-telegram" style="display: inline;">
                             <button type="submit" class="btn btn-secondary btn-sm">Send Test Message</button>
                         </form>
-                    {% else %}
-                        <span class="text-sm text-muted">Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID</span>
                     {% endif %}
                 </td>
             </tr>
             <tr>
                 <td><strong>OpenRouter LLM</strong></td>
                 <td>
-                    {% if current_settings.has_openrouter %}
+                    {% if current_settings.has_openrouter or db_settings.get('openrouter_api_key') %}
                         <span class="badge badge-success">Configured</span>
                     {% else %}
                         <span class="badge badge-gray">Not Configured (Rules Only)</span>
                     {% endif %}
                 </td>
                 <td class="text-sm text-muted">
-                    {% if current_settings.has_openrouter %}
-                        Model: {{ current_settings.openrouter_model }}
-                    {% else %}
-                        Set OPENROUTER_API_KEY to enable LLM fallback
+                    {% if current_settings.has_openrouter or db_settings.get('openrouter_api_key') %}
+                        Model: {{ db_settings.get('openrouter_model', current_settings.openrouter_model) }}
                     {% endif %}
                 </td>
             </tr>
         </tbody>
     </table>
-</div>
-
-<div class="card">
-    <h2>Environment Variables Reference</h2>
-    <div class="text-sm" style="font-family: monospace; background: #f3f4f6; padding: 1rem; border-radius: 0.375rem; overflow-x: auto;">
-        <pre style="margin: 0;">
-# Database
-DATABASE_URL=sqlite:///./market_radar.db
-
-# Admin
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=changeme
-SECRET_KEY=your-secret-key
-
-# Telegram
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_CHAT_ID=your-chat-id
-
-# OpenRouter (optional)
-OPENROUTER_API_KEY=your-api-key
-OPENROUTER_MODEL=anthropic/claude-3-haiku
-
-# Thresholds
-ALERT_THRESHOLD=70
-DIGEST_THRESHOLD=30
-POLL_INTERVAL_SECONDS=60
-DEFAULT_COOLDOWN_MINUTES=15
-        </pre>
-    </div>
 </div>
 
 {% endblock %}
