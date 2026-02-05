@@ -456,6 +456,187 @@ nano .env
 # Change PORT=8000 to PORT=8001
 ```
 
+**"No module named 'radar'" or "ModuleNotFoundError: No module named 'radar'"**
+
+This is the most common deployment error. It occurs when the `radar` package is not installed in your virtual environment. Follow these steps to fix it:
+
+1. First, verify that `pyproject.toml` exists in your project directory:
+```bash
+ls -la ~/apps/market-radar-bot/pyproject.toml
+```
+
+2. If the file is **missing**, you need to create it. See the "Missing pyproject.toml" section below.
+
+3. If the file **exists**, reinstall the package:
+```bash
+cd ~/apps/market-radar-bot
+source venv/bin/activate
+pip install -e .
+```
+
+4. Verify the `radar` command is available:
+```bash
+which radar
+# Should output: /home/your-username/apps/market-radar-bot/venv/bin/radar
+```
+
+5. Restart the service:
+```bash
+sudo systemctl restart market-radar-web
+sudo systemctl restart market-radar-monitor
+```
+
+**"status=203/EXEC" in systemd logs**
+
+This error means the executable cannot be found. Usually caused by:
+- Missing `radar` command (see above)
+- Incorrect paths in the systemd service file
+- Virtual environment not properly set up
+
+Check that the paths in your service file match your actual installation:
+```bash
+cat /etc/systemd/system/market-radar-web.service
+# Verify WorkingDirectory and ExecStart paths are correct
+```
+
+---
+
+### Missing pyproject.toml
+
+If `pyproject.toml` is missing from your project directory (this can happen after certain git operations), create it with this content:
+
+```bash
+cat > ~/apps/market-radar-bot/pyproject.toml << 'EOF'
+[project]
+name = "market-radar-bot"
+version = "0.1.0"
+description = "Proactive Market Impact Radar - monitors influential people, institutions, and events for market-moving news"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Market Radar Team"}
+]
+
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "sqlalchemy>=2.0.25",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "feedparser>=6.0.10",
+    "httpx>=0.26.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.1.0",
+    "apscheduler>=3.10.4",
+    "jinja2>=3.1.3",
+    "python-multipart>=0.0.6",
+    "itsdangerous>=2.1.2",
+    "passlib[bcrypt]>=1.7.4",
+    "pytz>=2024.1",
+    "structlog>=24.1.0",
+    "click>=8.1.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+]
+
+[project.scripts]
+radar = "radar.cli:cli"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["radar*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+EOF
+```
+
+Then install the package:
+```bash
+cd ~/apps/market-radar-bot
+source venv/bin/activate
+pip install -e .
+sudo systemctl restart market-radar-web
+sudo systemctl restart market-radar-monitor
+```
+
+---
+
+### Verifying Your Installation
+
+Run this checklist to verify everything is set up correctly:
+
+```bash
+# 1. Go to your project directory
+cd ~/apps/market-radar-bot
+
+# 2. Check required files exist
+ls pyproject.toml .env radar/
+
+# 3. Activate virtual environment
+source venv/bin/activate
+
+# 4. Verify radar command is installed
+which radar
+# Expected: /home/your-username/apps/market-radar-bot/venv/bin/radar
+
+# 5. Test the radar command
+radar --help
+# Should show available commands
+
+# 6. Test Telegram (if configured)
+radar send-test
+
+# 7. Check services are running
+sudo systemctl status market-radar-web
+sudo systemctl status market-radar-monitor
+```
+
+---
+
+### Directory Structure Requirements
+
+Your project directory MUST have this structure for the application to work:
+
+```
+~/apps/market-radar-bot/           # Main project directory
+├── pyproject.toml                 # REQUIRED - Package configuration
+├── .env                           # REQUIRED - Environment configuration
+├── radar/                         # REQUIRED - Python source code
+│   ├── __init__.py
+│   ├── cli.py                     # CLI entry point
+│   ├── main.py
+│   └── ... (other modules)
+├── venv/                          # Virtual environment
+├── market_radar.db                # SQLite database (created by init-db)
+└── tests/                         # Optional test files
+```
+
+**IMPORTANT:** The `radar` command is installed from `pyproject.toml`. The `[project.scripts]` section defines:
+```toml
+[project.scripts]
+radar = "radar.cli:cli"
+```
+
+This tells Python to create a `radar` command that calls the `cli()` function in `radar/cli.py`.
+
+---
+
+### Other Common Issues:
+
 **"No module named..."**
 Reinstall dependencies:
 ```bash

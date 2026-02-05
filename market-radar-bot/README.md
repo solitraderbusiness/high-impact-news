@@ -25,6 +25,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+> **IMPORTANT:** The `pip install -e .` command requires `pyproject.toml` to exist in the current directory. This file defines the `radar` CLI command. If you get "No module named 'radar'" errors, ensure `pyproject.toml` exists and re-run `pip install -e .`. See [DEPLOYMENT.md](DEPLOYMENT.md#missing-pyprojecttoml) for troubleshooting.
+
 2. **Configure environment:**
 ```bash
 cp .env.example .env
@@ -363,6 +365,30 @@ MIT License - See LICENSE file for details.
 2. Create a feature branch
 3. Write tests for new functionality
 4. Submit a pull request
+
+### For Developers
+
+**Critical Files:**
+- `pyproject.toml` - Defines the package, dependencies, and the `radar` CLI command. **Must exist** for the app to work.
+- `radar/cli.py` - CLI entry point defined in `[project.scripts]` section
+- `.env` - Environment configuration (copy from `.env.example`)
+
+**After cloning or pulling changes:**
+```bash
+cd market-radar-bot
+source venv/bin/activate
+pip install -e .  # Always run this after pulling code changes
+```
+
+**Git Branch Workflow:**
+- Feature branches should be prefixed with `claude/` or your identifier
+- Always test locally before deploying
+- After merging, remember to run `pip install -e .` on the server
+
+**Common Developer Issues:**
+- If `radar` command not found: Run `pip install -e .`
+- If imports fail: Ensure you're in the venv (`source venv/bin/activate`)
+- If pyproject.toml missing after git operations: See [DEPLOYMENT.md](DEPLOYMENT.md#missing-pyprojecttoml)
 
 ---
 
