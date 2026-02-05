@@ -217,35 +217,51 @@
     <!-- Schedule Settings -->
     <div class="mb-4" style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
         <h3 style="margin-top: 0; font-size: 1rem;">⏰ Automatic Daily Schedule</h3>
-        <form method="POST" action="/admin/settings/save-summary-schedule" class="flex gap-2 items-center flex-wrap">
-            <label class="flex items-center gap-2">
-                <input type="checkbox" name="daily_summary_enabled" value="1"
-                       {% if db_settings.get('daily_summary_enabled') == '1' %}checked{% endif %}>
-                <span>Enable daily summary</span>
-            </label>
-            <span class="text-sm">at</span>
-            <input type="time" name="daily_summary_time"
-                   value="{{ db_settings.get('daily_summary_time', '18:00') }}"
-                   class="form-input" style="width: 120px;">
-            <span class="text-sm">Tehran time</span>
-            <span class="text-sm">for last</span>
-            <select name="daily_summary_hours" class="form-input" style="width: 100px;">
-                {% set current_hours = db_settings.get('daily_summary_hours', '24') %}
-                <option value="12" {% if current_hours == '12' %}selected{% endif %}>12 hours</option>
-                <option value="24" {% if current_hours == '24' %}selected{% endif %}>24 hours</option>
-                <option value="48" {% if current_hours == '48' %}selected{% endif %}>48 hours</option>
-            </select>
-            <button type="submit" class="btn btn-secondary btn-sm">Save Schedule</button>
+        <form method="POST" action="/admin/settings/save-summary-schedule">
+            <table style="margin-bottom: 1rem;">
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <label class="flex items-center gap-2" style="cursor: pointer;">
+                                <input type="checkbox" name="daily_summary_enabled" value="1"
+                                       {% if db_settings.get('daily_summary_enabled') == '1' %}checked{% endif %}
+                                       style="width: 18px; height: 18px;">
+                                <strong>Enable automatic daily summary</strong>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <span>Send at </span>
+                            <input type="time" name="daily_summary_time"
+                                   value="{{ db_settings.get('daily_summary_time', '18:00') }}"
+                                   class="form-input" style="width: 100px;">
+                            <span> Tehran time</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <span>Analyze news from last </span>
+                            <select name="daily_summary_hours" class="form-input" style="width: 100px;">
+                                {% set current_hours = db_settings.get('daily_summary_hours', '24') %}
+                                <option value="12" {% if current_hours == '12' %}selected{% endif %}>12 hours</option>
+                                <option value="24" {% if current_hours == '24' %}selected{% endif %}>24 hours</option>
+                                <option value="48" {% if current_hours == '48' %}selected{% endif %}>48 hours</option>
+                            </select>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-primary">💾 Save Schedule Settings</button>
         </form>
-        {% if db_settings.get('daily_summary_enabled') == '1' %}
-        <div class="text-sm text-muted mt-2">
-            ✅ Summary will be sent daily at {{ db_settings.get('daily_summary_time', '18:00') }} Tehran time
+
+        <div style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; {% if db_settings.get('daily_summary_enabled') == '1' %}background: #d4edda; border: 1px solid #c3e6cb;{% else %}background: #f8f9fa; border: 1px solid #dee2e6;{% endif %}">
+            {% if db_settings.get('daily_summary_enabled') == '1' %}
+            <strong>✅ ENABLED</strong> — Summary will be sent daily at <strong>{{ db_settings.get('daily_summary_time', '18:00') }}</strong> Tehran time
+            {% else %}
+            <strong>⚪ DISABLED</strong> — Check the box above and click Save to enable
+            {% endif %}
         </div>
-        {% else %}
-        <div class="text-sm text-muted mt-2">
-            ⚪ Automatic daily summary is disabled
-        </div>
-        {% endif %}
     </div>
 
     <!-- Manual Send -->
