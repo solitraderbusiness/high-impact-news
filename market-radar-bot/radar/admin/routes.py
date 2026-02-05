@@ -881,6 +881,51 @@ async def test_telegram(request: Request):
     )
 
 
+@router.post("/settings/send-daily-summary")
+async def send_daily_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    hours: int = Form(24),
+):
+    """Generate and send daily market summary to Telegram."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from radar.notify.daily_summary import DailySummaryGenerator
+
+    notifier = TelegramNotifier()
+    if not notifier.is_available:
+        return RedirectResponse(
+            url="/admin/settings?message=Telegram+not+configured",
+            status_code=302
+        )
+
+    # Generate summary
+    generator = DailySummaryGenerator()
+    summary = generator.generate_summary(db, hours=hours)
+
+    if not summary:
+        return RedirectResponse(
+            url=f"/admin/settings?message=No+alerts+in+last+{hours}+hours",
+            status_code=302
+        )
+
+    # Format and send
+    message_text = generator.format_telegram_message(summary)
+    result = notifier.send_raw_message(message_text)
+
+    if result.success:
+        message = f"Daily+summary+sent!+{summary.total_alerts}+alerts,+{len(summary.assets)}+assets"
+    else:
+        message = f"Failed:+{result.error[:50] if result.error else 'Unknown'}"
+
+    return RedirectResponse(
+        url=f"/admin/settings?message={message}",
+        status_code=302
+    )
+
+
 # =============================================================================
 # Dashboard / Index
 # =============================================================================

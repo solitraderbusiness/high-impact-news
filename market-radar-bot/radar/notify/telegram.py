@@ -104,6 +104,16 @@ class TelegramNotifier:
 
         return self._send_with_retry(message)
 
+    def send_raw_message(self, message: str) -> SendResult:
+        """Send a pre-formatted message (for summaries, etc.)."""
+        if not self.is_available:
+            return SendResult(
+                success=False,
+                error="Telegram not configured",
+            )
+
+        return self._send_with_retry(message)
+
     def _format_message(self, data: AlertData) -> str:
         """Format alert data into a Telegram message using HTML with Persian translation."""
         # Severity emoji and header based on score

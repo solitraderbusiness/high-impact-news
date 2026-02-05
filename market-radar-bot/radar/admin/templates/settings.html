@@ -208,4 +208,36 @@
     </table>
 </div>
 
+<div class="card">
+    <h2>📊 Daily Market Summary</h2>
+    <p class="text-sm text-muted mb-4">
+        Generate and send a market sentiment summary based on recent alerts.
+        Shows sentiment analysis per asset and daily price changes.
+    </p>
+
+    <form method="POST" action="/admin/settings/send-daily-summary" class="flex gap-2 items-center">
+        <label class="text-sm" style="margin-bottom: 0;">Look back:</label>
+        <select name="hours" class="form-input" style="width: 120px;">
+            <option value="6">6 hours</option>
+            <option value="12">12 hours</option>
+            <option value="24" selected>24 hours</option>
+            <option value="48">48 hours</option>
+            <option value="72">72 hours</option>
+        </select>
+        <button type="submit" class="btn btn-primary">
+            📤 Generate & Send Summary
+        </button>
+    </form>
+
+    <div class="text-sm text-muted mt-2">
+        <strong>Summary includes:</strong>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>Sentiment analysis per asset (BULLISH/BEARISH/NEUTRAL)</li>
+            <li>24h price changes from Yahoo Finance</li>
+            <li>Top stories by severity score</li>
+            <li>Bullish/bearish news count per asset</li>
+        </ul>
+    </div>
+</div>
+
 {% endblock %}

@@ -455,6 +455,35 @@ def suppress_detection(db: Session, detection_id: int, reason: str) -> None:
         db.commit()
 
 
+def get_recent_detections_for_summary(
+    db: Session,
+    since: datetime,
+    alerted_only: bool = True,
+) -> List[Detection]:
+    """
+    Get recent detections for daily summary generation.
+
+    Args:
+        db: Database session
+        since: Get detections after this time
+        alerted_only: Only include detections that triggered alerts
+
+    Returns:
+        List of Detection objects with event and watch_item loaded
+    """
+    query = (
+        select(Detection)
+        .options(joinedload(Detection.event), joinedload(Detection.watch_item))
+        .where(Detection.created_at >= since)
+    )
+
+    if alerted_only:
+        query = query.where(Detection.is_alerted == True)
+
+    query = query.order_by(Detection.severity_score.desc())
+    return list(db.execute(query).unique().scalars().all())
+
+
 # =============================================================================
 # Alerts
 # =============================================================================
