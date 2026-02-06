@@ -80,7 +80,8 @@ market-radar-bot/
 │   │   ├── rules.py               # RuleMatcher - keyword/entity matching
 │   │   ├── scoring.py             # SeverityScorer - 0-100 scoring
 │   │   ├── dedup.py               # Deduplicator - hash + cooldown
-│   │   └── llm_openrouter.py      # OpenRouterClient - LLM fallback
+│   │   ├── llm_openrouter.py      # OpenRouterClient - LLM fallback
+│   │   └── market_relevance.py    # MarketRelevanceFilter - filters non-market news
 │   │
 │   ├── notify/                    # Notifications
 │   │   ├── __init__.py
@@ -399,13 +400,45 @@ pytest tests/test_scoring.py -v
 - 90+: Bypass cooldown
 - 30-69: Include in digest
 
-### 4. Settings in Database
+### 4. Market Relevance Filter (NEW)
+
+**Problem:** Entity matching (e.g., "Donald Trump") flagged all related news as market-relevant, even political gossip and social issues that don't affect prices.
+
+**Solution:** LLM-based content filter that evaluates if news actually impacts financial markets.
+
+**Categories (High Relevance - 80-100):**
+- `central_bank`: Fed/ECB/BOJ decisions and statements
+- `monetary_policy`: Rate decisions, QE/QT, tapering
+- `economic_data`: GDP, CPI, NFP, PMI releases
+- `trade_policy`: Tariffs, sanctions, trade deals
+- `market_event`: Crashes, circuit breakers, bank failures
+
+**Categories (Low Relevance - 0-30):**
+- `political_noise`: Scandals, investigations, gossip
+- `social_issues`: HR disputes, discrimination cases
+- `entertainment`: Celebrity news, sports
+- `crime`: Non-financial crimes
+
+**How It Works:**
+1. News with relevance score < 30 → Skipped entirely
+2. News with relevance score 30-69 → Score multiplied by relevance %
+3. News with relevance score 70+ → Normal processing
+
+**Example:**
+- "ECB raises rates by 25bp" → central_bank (95%) → Full score
+- "Nike investigated for workplace discrimination" → social_issues (10%) → Skipped
+- "Trump announces new tariffs on China" → trade_policy (90%) → Full score
+- "Epstein investigation update" → political_noise (15%) → Skipped
+
+**Code:** `radar/detect/market_relevance.py`
+
+### 5. Settings in Database
 
 **Why:** Change thresholds without restarting service.
 
 **How:** `AppSettings` table stores key-value pairs. `get_settings_with_db_overrides()` merges .env with DB.
 
-### 5. Learning System
+### 6. Learning System
 
 **Purpose:** Improve over time by tracking:
 - Actual price movements after alerts
@@ -425,6 +458,7 @@ pytest tests/test_scoring.py -v
 | `radar/services/pipeline.py` | Main orchestration | Adding new pipeline steps |
 | `radar/detect/rules.py` | Keyword/entity matching | Changing match logic |
 | `radar/detect/scoring.py` | Severity calculation | Adjusting scoring |
+| `radar/detect/market_relevance.py` | Market relevance filter | Adjusting relevance categories |
 | `radar/notify/telegram.py` | Alert formatting | Changing alert format |
 | `radar/admin/routes.py` | All admin endpoints | Adding admin features |
 | `radar/models.py` | Database schema | Adding new tables/fields |
