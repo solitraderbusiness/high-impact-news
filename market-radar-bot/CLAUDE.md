@@ -654,6 +654,12 @@ Settings are read at startup and cached.
     - Risk factors that invalidate the trade
     - Compact format (Persian title only, no duplication)
     - Removed visual noise (progress bars, match percentages)
+11. **API Cost Tracking** - Monitor OpenRouter API spending:
+    - New `/admin/costs` page with daily/weekly/monthly costs
+    - Cost breakdown by purpose (analysis, translation, summary)
+    - Cost breakdown by model
+    - Recent API calls table with token counts
+    - All API calls (analysis, translation, summary) are logged automatically
 
 ### Known Issues
 
