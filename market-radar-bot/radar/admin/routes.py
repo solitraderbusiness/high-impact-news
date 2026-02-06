@@ -1014,6 +1014,113 @@ async def save_summary_schedule(
     )
 
 
+@router.post("/settings/save-sentiment-schedule")
+async def save_sentiment_schedule(
+    request: Request,
+    db: Session = Depends(get_db),
+    sentiment_1h_enabled: Optional[str] = Form(None),
+    sentiment_4h_enabled: Optional[str] = Form(None),
+    sentiment_daily_enabled: Optional[str] = Form(None),
+    sentiment_daily_time: str = Form("08:00"),
+):
+    """Save sentiment report schedule settings."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Save schedule settings
+    storage.set_app_setting(
+        db, "sentiment_1h_enabled",
+        "1" if sentiment_1h_enabled else "0",
+        "Enable hourly sentiment reports"
+    )
+    storage.set_app_setting(
+        db, "sentiment_4h_enabled",
+        "1" if sentiment_4h_enabled else "0",
+        "Enable 4-hour sentiment reports"
+    )
+    storage.set_app_setting(
+        db, "sentiment_daily_enabled",
+        "1" if sentiment_daily_enabled else "0",
+        "Enable daily sentiment reports"
+    )
+    storage.set_app_setting(
+        db, "sentiment_daily_time",
+        sentiment_daily_time,
+        "Time to send daily sentiment (Tehran)"
+    )
+
+    # Build status message
+    enabled_list = []
+    if sentiment_1h_enabled:
+        enabled_list.append("1H")
+    if sentiment_4h_enabled:
+        enabled_list.append("4H")
+    if sentiment_daily_enabled:
+        enabled_list.append(f"Daily@{sentiment_daily_time}")
+
+    if enabled_list:
+        message = f"Sentiment+schedule+saved:+{','.join(enabled_list)}"
+    else:
+        message = "All+sentiment+reports+disabled"
+
+    return RedirectResponse(
+        url=f"/admin/settings?message={message}",
+        status_code=302
+    )
+
+
+@router.post("/settings/send-sentiment")
+async def send_sentiment(
+    request: Request,
+    db: Session = Depends(get_db),
+    hours: int = Form(4),
+):
+    """Generate and send sentiment report to Telegram."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from radar.notify.sentiment import SentimentAnalyzer
+
+    notifier = TelegramNotifier()
+    if not notifier.is_available:
+        return RedirectResponse(
+            url="/admin/settings?message=Telegram+not+configured",
+            status_code=302
+        )
+
+    # Generate sentiment report
+    analyzer = SentimentAnalyzer()
+    report = analyzer.analyze(db, hours=hours)
+
+    if not report:
+        return RedirectResponse(
+            url=f"/admin/settings?message=No+sentiment+data+in+last+{hours}+hours",
+            status_code=302
+        )
+
+    if report.total_news_count < 1:
+        return RedirectResponse(
+            url=f"/admin/settings?message=Insufficient+data+({report.total_news_count}+news)",
+            status_code=302
+        )
+
+    # Format and send
+    message_text = analyzer.format_telegram_message(report)
+    result = notifier.send_raw_message(message_text)
+
+    if result.success:
+        message = f"Sentiment+sent!+{report.total_news_count}+news+analyzed"
+    else:
+        message = f"Failed:+{result.error[:50] if result.error else 'Unknown'}"
+
+    return RedirectResponse(
+        url=f"/admin/settings?message={message}",
+        status_code=302
+    )
+
+
 # =============================================================================
 # Dashboard / Index
 # =============================================================================

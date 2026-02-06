@@ -380,4 +380,104 @@ echo "Deployed at $(date)"</pre>
     </div>
 </div>
 
+<div class="card">
+    <h2>📈 Market Sentiment Reports</h2>
+    <p class="text-sm text-muted mb-4">
+        Aggregated sentiment analysis for BTC, Gold, Oil, and DXY based on collected news.
+    </p>
+
+    <!-- Sentiment Schedule Settings -->
+    <div class="mb-4" style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin-top: 0; font-size: 1rem;">⏰ Automatic Sentiment Reports</h3>
+        <form method="POST" action="/admin/settings/save-sentiment-schedule">
+            <table style="margin-bottom: 1rem;">
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <label class="flex items-center gap-2" style="cursor: pointer;">
+                                <input type="checkbox" name="sentiment_1h_enabled" value="1"
+                                       {% if db_settings.get('sentiment_1h_enabled') == '1' %}checked{% endif %}
+                                       style="width: 18px; height: 18px;">
+                                <strong>1-Hour Sentiment</strong>
+                                <span class="text-sm text-muted">— Every hour at :00</span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <label class="flex items-center gap-2" style="cursor: pointer;">
+                                <input type="checkbox" name="sentiment_4h_enabled" value="1"
+                                       {% if db_settings.get('sentiment_4h_enabled') == '1' %}checked{% endif %}
+                                       style="width: 18px; height: 18px;">
+                                <strong>4-Hour Sentiment</strong>
+                                <span class="text-sm text-muted">— At 00:00, 04:00, 08:00, 12:00, 16:00, 20:00</span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
+                            <label class="flex items-center gap-2" style="cursor: pointer;">
+                                <input type="checkbox" name="sentiment_daily_enabled" value="1"
+                                       {% if db_settings.get('sentiment_daily_enabled') == '1' %}checked{% endif %}
+                                       style="width: 18px; height: 18px;">
+                                <strong>Daily Sentiment</strong>
+                            </label>
+                            <span style="margin-left: 26px;">
+                                at <input type="time" name="sentiment_daily_time"
+                                       value="{{ db_settings.get('sentiment_daily_time', '08:00') }}"
+                                       class="form-input" style="width: 100px;"> Tehran
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-primary">💾 Save Sentiment Schedule</button>
+        </form>
+
+        <!-- Status Display -->
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            {% if db_settings.get('sentiment_1h_enabled') == '1' %}
+            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ 1H</span>
+            {% else %}
+            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ 1H</span>
+            {% endif %}
+            {% if db_settings.get('sentiment_4h_enabled') == '1' %}
+            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ 4H</span>
+            {% else %}
+            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ 4H</span>
+            {% endif %}
+            {% if db_settings.get('sentiment_daily_enabled') == '1' %}
+            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ Daily @ {{ db_settings.get('sentiment_daily_time', '08:00') }}</span>
+            {% else %}
+            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ Daily</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Manual Send -->
+    <h3 style="font-size: 1rem;">📤 Send Sentiment Now</h3>
+    <form method="POST" action="/admin/settings/send-sentiment" class="flex gap-2 items-center">
+        <label class="text-sm" style="margin-bottom: 0;">Period:</label>
+        <select name="hours" class="form-input" style="width: 120px;">
+            <option value="1">1 hour</option>
+            <option value="4" selected>4 hours</option>
+            <option value="24">24 hours</option>
+        </select>
+        <button type="submit" class="btn btn-primary">
+            Generate & Send Now
+        </button>
+    </form>
+
+    <div class="text-sm text-muted mt-4">
+        <strong>Sentiment report includes:</strong>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>Aggregated sentiment for <strong>BTC, Gold, Oil, DXY</strong></li>
+            <li>Bullish/Bearish/Neutral classification per asset</li>
+            <li>Sentiment strength indicator (Strong/Moderate/Weak)</li>
+            <li>Key news drivers for each asset</li>
+            <li>Visual sentiment bars</li>
+        </ul>
+    </div>
+</div>
+
 {% endblock %}

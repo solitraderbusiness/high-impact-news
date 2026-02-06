@@ -70,6 +70,15 @@ class Scheduler:
             replace_existing=True,
         )
 
+        # Add sentiment report jobs (check every minute)
+        self.scheduler.add_job(
+            self._check_sentiment_reports,
+            trigger=IntervalTrigger(minutes=1),
+            id='sentiment_checker',
+            name='Sentiment Report Checker',
+            replace_existing=True,
+        )
+
         # Set up signal handlers
         if blocking:
             signal.signal(signal.SIGINT, self._handle_shutdown)
@@ -220,6 +229,96 @@ class Scheduler:
 
         except Exception as e:
             logger.error("daily_summary_send_error", error=str(e))
+
+
+    def _check_sentiment_reports(self) -> None:
+        """Check if it's time to send sentiment reports (1h, 4h, daily)."""
+        try:
+            from radar.db import get_db_context
+            from radar import storage
+
+            with get_db_context() as db:
+                tehran_tz = pytz.timezone("Asia/Tehran")
+                now_tehran = datetime.now(tehran_tz)
+                current_hour = now_tehran.hour
+                current_minute = now_tehran.minute
+
+                # Only check at the top of the hour (minute 0)
+                if current_minute != 0:
+                    return
+
+                # Check 1-hour sentiment (every hour)
+                if storage.get_app_setting(db, "sentiment_1h_enabled") == "1":
+                    last_sent = storage.get_app_setting(db, "sentiment_1h_last_sent")
+                    current_key = now_tehran.strftime("%Y-%m-%d-%H")
+                    if last_sent != current_key:
+                        logger.info("sentiment_1h_triggered", hour=current_hour)
+                        self._send_sentiment_report(db, hours=1)
+                        storage.set_app_setting(db, "sentiment_1h_last_sent", current_key, "Last 1H sentiment sent")
+
+                # Check 4-hour sentiment (at 0, 4, 8, 12, 16, 20)
+                if storage.get_app_setting(db, "sentiment_4h_enabled") == "1":
+                    if current_hour % 4 == 0:
+                        last_sent = storage.get_app_setting(db, "sentiment_4h_last_sent")
+                        current_key = now_tehran.strftime("%Y-%m-%d-%H")
+                        if last_sent != current_key:
+                            logger.info("sentiment_4h_triggered", hour=current_hour)
+                            self._send_sentiment_report(db, hours=4)
+                            storage.set_app_setting(db, "sentiment_4h_last_sent", current_key, "Last 4H sentiment sent")
+
+                # Check daily sentiment (at configured time, default 8:00)
+                if storage.get_app_setting(db, "sentiment_daily_enabled") == "1":
+                    scheduled_time = storage.get_app_setting(db, "sentiment_daily_time") or "08:00"
+                    scheduled_hour = int(scheduled_time.split(":")[0])
+                    if current_hour == scheduled_hour:
+                        last_sent = storage.get_app_setting(db, "sentiment_daily_last_sent")
+                        today_date = now_tehran.strftime("%Y-%m-%d")
+                        if last_sent != today_date:
+                            logger.info("sentiment_daily_triggered", hour=current_hour)
+                            self._send_sentiment_report(db, hours=24)
+                            storage.set_app_setting(db, "sentiment_daily_last_sent", today_date, "Last daily sentiment sent")
+
+        except Exception as e:
+            logger.error("sentiment_check_error", error=str(e))
+
+    def _send_sentiment_report(self, db, hours: int) -> None:
+        """Generate and send a sentiment report."""
+        try:
+            from radar.notify.sentiment import SentimentAnalyzer
+            from radar.notify.telegram import TelegramNotifier
+
+            analyzer = SentimentAnalyzer()
+            report = analyzer.analyze(db, hours=hours)
+
+            if not report:
+                logger.info("sentiment_no_data", hours=hours)
+                return
+
+            # Only send if there's meaningful data
+            if report.total_news_count < 1:
+                logger.info("sentiment_insufficient_data", hours=hours, count=report.total_news_count)
+                return
+
+            # Send via Telegram
+            notifier = TelegramNotifier()
+            if not notifier.is_available:
+                logger.warning("sentiment_telegram_not_configured")
+                return
+
+            message_text = analyzer.format_telegram_message(report)
+            result = notifier.send_raw_message(message_text)
+
+            if result.success:
+                logger.info(
+                    "sentiment_report_sent",
+                    hours=hours,
+                    news_count=report.total_news_count,
+                )
+            else:
+                logger.error("sentiment_send_failed", error=result.error)
+
+        except Exception as e:
+            logger.error("sentiment_send_error", error=str(e))
 
 
 def run_scheduler(blocking: bool = True) -> Scheduler:
