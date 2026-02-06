@@ -38,6 +38,14 @@ class LLMMatch:
     is_market_relevant: bool = True
     relevance_score: int = 100
     relevance_category: str = "market_event"
+    # New trading-focused fields
+    trade_bias: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
+    primary_asset: Optional[str] = None  # Main asset to trade
+    setup: Optional[str] = None  # What happened and why it matters
+    key_levels: Optional[str] = None  # Price levels to watch
+    timeframe: str = "SWING"  # INTRADAY, SWING, POSITION
+    catalyst: Optional[str] = None  # What to watch for confirmation
+    risk: Optional[str] = None  # What could invalidate the trade
 
 
 @dataclass
@@ -124,65 +132,53 @@ class OpenRouterClient:
             for w in watch_items
         ])
 
-        prompt = f"""You are a senior financial market analyst at a major investment bank. Analyze the following news article for BOTH market relevance AND entity matching.
+        prompt = f"""You are a senior trader at Goldman Sachs. Analyze this news for trading opportunities.
 
-MONITORED ENTITIES/TOPICS:
+MONITORED ENTITIES:
 {items_text}
 
-ARTICLE TITLE:
-{title}
+HEADLINE: {title}
 
-ARTICLE TEXT:
+ARTICLE:
 {truncated_text}
 
-TASK - TWO-PART ANALYSIS:
+ANALYSIS REQUIRED:
 
-PART 1: MARKET RELEVANCE FILTER
-First, determine if this news is ACTUALLY relevant to financial markets. Ask yourself: "Would a trader at Goldman Sachs care about this?"
+1. MARKET RELEVANCE - Would this move prices? Score 0-100.
+   HIGH (80-100): Fed/central banks, rate decisions, GDP/CPI/NFP, tariffs, sanctions, geopolitical supply shocks
+   LOW (0-30): Political scandals, HR disputes, celebrity gossip, non-financial crimes
 
-HIGH RELEVANCE categories (80-100):
-- central_bank: Fed/ECB/BOJ decisions, statements
-- monetary_policy: Rate decisions, QE/QT, tapering
-- economic_data: GDP, CPI, NFP, PMI releases
-- trade_policy: Tariffs, sanctions, trade deals
-- fiscal_policy: Government spending, taxes, debt
-- market_event: Crashes, circuit breakers, IPOs
-- geopolitical_economic: Wars affecting commodities/supply chains
+2. TRADE SETUP - If relevant, what's the trade?
 
-LOW RELEVANCE categories (0-30) - these do NOT move markets:
-- political_noise: Scandals, investigations, gossip
-- social_issues: HR disputes, discrimination cases
-- entertainment: Celebrity news
-- crime: Non-financial crimes
-
-PART 2: ENTITY MATCHING (only if market-relevant)
-If the news IS market-relevant, determine which monitored entity it relates to.
-
-Respond in JSON format:
+Respond in JSON:
 {{
     "is_market_relevant": <true/false>,
     "relevance_score": <0-100>,
-    "relevance_category": "<category from above>",
-    "relevance_reasoning": "<1 sentence why this is/isn't market relevant>",
-    "match_id": <id of best matching entity or null if none/not relevant>,
-    "match_name": "<name of matched entity or null>",
-    "confidence": <0.0 to 1.0>,
-    "citations": ["<exact quote 1>", "<exact quote 2 if relevant>"],
-    "reasoning": "<brief one-line summary>",
-    "market_impact": "<ANALYST-STYLE ASSESSMENT: Write 3-5 sentences as a senior financial analyst. Core significance, market mechanics, what to watch. Skip if not market-relevant.>",
+    "relevance_category": "<central_bank|economic_data|trade_policy|fiscal_policy|geopolitical|political_noise|other>",
+    "match_id": <entity id or null>,
+    "match_name": "<entity name or null>",
+    "confidence": <0.0-1.0>,
+    "citations": ["<exact quote from article>"],
+
+    "trade_bias": "<BULLISH|BEARISH|NEUTRAL>",
+    "primary_asset": "<main asset to trade, e.g. SPY, DXY, XAUUSD>",
     "assets_with_impact": [
-        {{"symbol": "EUR", "direction": "bearish"}},
-        {{"symbol": "EURUSD", "direction": "bearish"}}
-    ]
+        {{"symbol": "SPY", "direction": "bullish"}},
+        {{"symbol": "US10Y", "direction": "bearish"}}
+    ],
+
+    "setup": "<1 sentence: what happened and why it matters>",
+    "key_levels": "<specific price levels to watch, or 'N/A' if not applicable>",
+    "timeframe": "<INTRADAY|SWING|POSITION>",
+    "catalyst": "<what to watch for confirmation/invalidation>",
+    "risk": "<what could make this trade wrong>"
 }}
 
-CRITICAL RULES:
-- Just because news mentions "Trump" or a famous person does NOT make it market-relevant
-- Political scandals and investigations are usually NOT market-relevant
-- Company HR/discrimination lawsuits are NOT market-relevant
-- Citations MUST be exact substrings from the article
-- If relevance_score < 50, set match_id to null (don't waste effort matching irrelevant news)
-- For assets_with_impact: "bullish" = price up, "bearish" = price down"""
+RULES:
+- Trump/famous names mentioned ≠ market relevant. Must have ECONOMIC impact.
+- Be specific with levels when possible (e.g., "SPY support at $480, resistance $495")
+- Citations must be EXACT quotes from the article
+- If relevance_score < 50, set match_id to null"""
 
         return prompt
 
@@ -257,6 +253,15 @@ CRITICAL RULES:
             reasoning = data.get("reasoning", "") or relevance_reasoning
             market_impact = data.get("market_impact", "")
 
+            # New trading-focused fields
+            trade_bias = data.get("trade_bias", "NEUTRAL")
+            primary_asset = data.get("primary_asset")
+            setup = data.get("setup", "")
+            key_levels = data.get("key_levels", "")
+            timeframe = data.get("timeframe", "SWING")
+            catalyst = data.get("catalyst", "")
+            risk = data.get("risk", "")
+
             # Parse assets with impact direction
             assets_with_impact_raw = data.get("assets_with_impact", [])
             assets_with_impact = []
@@ -289,6 +294,13 @@ CRITICAL RULES:
                     is_market_relevant=is_market_relevant,
                     relevance_score=relevance_score,
                     relevance_category=relevance_category,
+                    trade_bias=trade_bias,
+                    primary_asset=primary_asset,
+                    setup=setup,
+                    key_levels=key_levels,
+                    timeframe=timeframe,
+                    catalyst=catalyst,
+                    risk=risk,
                 )
 
             # Validate that match_id exists in watch_items
@@ -329,10 +341,17 @@ CRITICAL RULES:
                 reasoning=reasoning,
                 assets_affected=assets_affected,
                 assets_with_impact=assets_with_impact,
-                market_impact=market_impact or reasoning,  # Fall back to reasoning if no market_impact
+                market_impact=market_impact or setup or reasoning,  # Prefer setup for market_impact
                 is_market_relevant=is_market_relevant,
                 relevance_score=relevance_score,
                 relevance_category=relevance_category,
+                trade_bias=trade_bias,
+                primary_asset=primary_asset,
+                setup=setup,
+                key_levels=key_levels,
+                timeframe=timeframe,
+                catalyst=catalyst,
+                risk=risk,
             )
 
         except json.JSONDecodeError as e:

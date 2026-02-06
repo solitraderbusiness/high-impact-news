@@ -381,6 +381,14 @@ class Pipeline:
                                 'assets_affected': llm_match.assets_affected,
                                 'assets_with_impact': getattr(llm_match, 'assets_with_impact', []),
                                 'market_impact': getattr(llm_match, 'market_impact', None),
+                                # New trading fields
+                                'trade_bias': getattr(llm_match, 'trade_bias', 'NEUTRAL'),
+                                'primary_asset': getattr(llm_match, 'primary_asset', None),
+                                'setup': getattr(llm_match, 'setup', None),
+                                'key_levels': getattr(llm_match, 'key_levels', None),
+                                'timeframe': getattr(llm_match, 'timeframe', 'SWING'),
+                                'catalyst': getattr(llm_match, 'catalyst', None),
+                                'risk': getattr(llm_match, 'risk', None),
                             })()
                             match_method = "llm"
                         elif best_match and llm_match.watch_item_id == best_match.watch_item_id:
@@ -394,6 +402,14 @@ class Pipeline:
                                 'assets_affected': llm_match.assets_affected or getattr(best_match, 'assets_affected', []),
                                 'assets_with_impact': getattr(llm_match, 'assets_with_impact', []),
                                 'market_impact': getattr(llm_match, 'market_impact', None),
+                                # New trading fields
+                                'trade_bias': getattr(llm_match, 'trade_bias', 'NEUTRAL'),
+                                'primary_asset': getattr(llm_match, 'primary_asset', None),
+                                'setup': getattr(llm_match, 'setup', None),
+                                'key_levels': getattr(llm_match, 'key_levels', None),
+                                'timeframe': getattr(llm_match, 'timeframe', 'SWING'),
+                                'catalyst': getattr(llm_match, 'catalyst', None),
+                                'risk': getattr(llm_match, 'risk', None),
                             })()
                             match_method = "rules+llm"
 
@@ -502,8 +518,18 @@ class Pipeline:
                     suppression_reason = dup_reason
 
             if should_alert:
+                # Collect trading info from match
+                trading_info = {
+                    'trade_bias': getattr(best_match, 'trade_bias', 'NEUTRAL'),
+                    'primary_asset': getattr(best_match, 'primary_asset', None),
+                    'setup': getattr(best_match, 'setup', None),
+                    'key_levels': getattr(best_match, 'key_levels', None),
+                    'timeframe': getattr(best_match, 'timeframe', 'SWING'),
+                    'catalyst': getattr(best_match, 'catalyst', None),
+                    'risk': getattr(best_match, 'risk', None),
+                }
                 # Send alert
-                alert_result = self._send_alert(db, event, detection, watch_item, assets_with_impact)
+                alert_result = self._send_alert(db, event, detection, watch_item, assets_with_impact, trading_info)
                 is_alerted = alert_result
             else:
                 # Suppress
@@ -549,6 +575,7 @@ class Pipeline:
         detection,
         watch_item: WatchItem,
         assets_with_impact: list = None,
+        trading_info: dict = None,
     ) -> bool:
         """Send alert and record result."""
         # Convert assets_with_impact to AssetWithDirection objects
@@ -558,6 +585,9 @@ class Pipeline:
                 AssetWithDirection(symbol=a.symbol, direction=a.direction)
                 for a in assets_with_impact
             ]
+
+        # Extract trading info
+        trading_info = trading_info or {}
 
         alert_data = AlertData(
             title=event.title,
@@ -571,6 +601,14 @@ class Pipeline:
             published_at=event.published_at,
             market_impact=detection.llm_reasoning,  # Contains detailed market impact analysis
             assets_with_direction=assets_with_direction,
+            # New trading fields
+            trade_bias=trading_info.get('trade_bias', 'NEUTRAL'),
+            primary_asset=trading_info.get('primary_asset'),
+            setup=trading_info.get('setup'),
+            key_levels=trading_info.get('key_levels'),
+            timeframe=trading_info.get('timeframe', 'SWING'),
+            catalyst=trading_info.get('catalyst'),
+            risk=trading_info.get('risk'),
         )
 
         # Format message for storage

@@ -39,6 +39,14 @@ class AlertData:
     published_at: Optional[datetime]
     market_impact: Optional[str] = None  # Detailed market impact analysis
     assets_with_direction: Optional[List[AssetWithDirection]] = None  # Assets with bullish/bearish direction
+    # New trading-focused fields
+    trade_bias: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
+    primary_asset: Optional[str] = None
+    setup: Optional[str] = None  # What happened and why it matters
+    key_levels: Optional[str] = None  # Price levels to watch
+    timeframe: str = "SWING"  # INTRADAY, SWING, POSITION
+    catalyst: Optional[str] = None  # What to watch for confirmation
+    risk: Optional[str] = None  # What could invalidate the trade
 
 
 @dataclass
@@ -115,81 +123,129 @@ class TelegramNotifier:
         return self._send_with_retry(message)
 
     def _format_message(self, data: AlertData) -> str:
-        """Format alert data into a Telegram message using HTML with Persian translation."""
-        # Severity emoji and header based on score
+        """Format alert data into a compact, actionable Telegram message."""
+        # Severity header
         if data.severity_score >= 90:
-            severity_emoji = "🚨"
             header = "🔴 HIGH IMPACT"
-            bar = "█████████████████"
         elif data.severity_score >= 70:
-            severity_emoji = "⚠️"
             header = "🟠 IMPORTANT"
-            bar = "█████████████░░░░"
         elif data.severity_score >= 50:
-            severity_emoji = "📢"
             header = "🟡 NOTABLE"
-            bar = "█████████░░░░░░░░"
         else:
-            severity_emoji = "📌"
             header = "🔵 INFO"
-            bar = "█████░░░░░░░░░░░░"
 
-        # Format assets with direction arrows
-        assets_text = self._format_assets_with_direction(data)
+        # Trade bias emoji
+        bias = data.trade_bias.upper() if data.trade_bias else "NEUTRAL"
+        if bias == "BULLISH":
+            bias_emoji = "📈"
+            bias_text = "BULLISH"
+        elif bias == "BEARISH":
+            bias_emoji = "📉"
+            bias_text = "BEARISH"
+        else:
+            bias_emoji = "➖"
+            bias_text = "NEUTRAL"
 
-        # Try to translate title and market impact to Persian
+        # Format assets with direction (compact)
+        assets_lines = []
+        if data.assets_with_direction:
+            bullish = [a.symbol for a in data.assets_with_direction if a.direction == "bullish"]
+            bearish = [a.symbol for a in data.assets_with_direction if a.direction == "bearish"]
+            if bullish:
+                assets_lines.append(f"📈 {', '.join(bullish[:4])}")
+            if bearish:
+                assets_lines.append(f"📉 {', '.join(bearish[:4])}")
+        elif data.assets_affected:
+            assets_lines.append(f"• {', '.join(data.assets_affected[:4])}")
+
+        assets_text = "\n".join(assets_lines) if assets_lines else "• N/A"
+
+        # Translate title to Persian
         translator = PersianTranslator()
+        translated = translator.translate(data.title, [])
 
-        # Include market impact in translation if available
-        texts_to_translate = []
-        if data.market_impact:
-            texts_to_translate.append(data.market_impact)
-
-        translated = translator.translate(data.title, texts_to_translate)
-
-        # Use translated content if available
         if translated:
-            title_text = translated["title"]
-            persian_texts = translated.get("quotes", [])
-            persian_impact = persian_texts[0] if persian_texts else None
+            title_fa = self._escape_html(translated["title"])
         else:
-            title_text = data.title[:200]
-            persian_impact = None
+            title_fa = self._escape_html(data.title[:150])
 
-        # Format market impact section (the main info section)
-        info_text = ""
-        if data.market_impact:
-            if persian_impact:
-                escaped_fa_impact = self._escape_html(persian_impact)
-                info_text = f"\n{escaped_fa_impact}"
-            escaped_impact = self._escape_html(data.market_impact)
-            info_text += f"\n\n<i>{escaped_impact}</i>"
-        else:
-            info_text = "\n<i>No detailed analysis available</i>"
+        # Format timestamp (Tehran only)
+        timestamp = self._format_timestamp_short(data.published_at or datetime.utcnow())
 
-        # Format timestamp
-        timestamp = self._format_timestamp(data.published_at or datetime.utcnow())
+        # Extract source domain
+        source_domain = self._extract_domain(data.source_url)
 
-        # Build message with cleaner visual structure
-        message = f"""{header}
-{bar} {data.severity_score}%
+        # Build compact message
+        message = f"""{header} | {data.severity_score}%
+{bias_emoji} <b>{bias_text}</b> {self._escape_html(data.primary_asset or '')}
 
-{severity_emoji} <b>{self._escape_html(title_text)}</b>
+<b>{title_fa}</b>
 
-<i>{self._escape_html(data.title[:200])}</i>
-
-📊 <b>{self._escape_html(data.watch_item_name)}</b> • {self._escape_html(data.watch_item_category)}
-💯 Match: {int(data.match_confidence * 100)}%
-
-💹 <b>Affected Assets:</b>
 {assets_text}
 
-💡 <b>Analysis:</b>{info_text}
+📊 {self._escape_html(data.watch_item_name)} | {self._escape_html(data.watch_item_category)}"""
 
-🔗 <a href="{data.source_url}">Read Full Article</a>
+        # Add setup (what happened)
+        if data.setup:
+            message += f"\n\n⚡ <b>SETUP:</b>\n{self._escape_html(data.setup)}"
+
+        # Add key levels if available
+        if data.key_levels and data.key_levels.lower() not in ['n/a', 'none', '']:
+            message += f"\n\n📍 <b>LEVELS:</b> {self._escape_html(data.key_levels)}"
+
+        # Add timeframe
+        if data.timeframe:
+            message += f"\n⏱ {self._escape_html(data.timeframe)}"
+
+        # Add catalyst/what to watch
+        if data.catalyst:
+            message += f"\n\n👁 <b>WATCH:</b> {self._escape_html(data.catalyst)}"
+
+        # Add risk
+        if data.risk:
+            message += f"\n⚠️ <b>RISK:</b> {self._escape_html(data.risk)}"
+
+        # Footer
+        message += f"""
+
+🔗 <a href="{data.source_url}">{source_domain}</a>
 🕐 {timestamp}"""
 
         return message
+
+    def _format_timestamp_short(self, dt: datetime) -> str:
+        """Format timestamp with Tehran time only."""
+        try:
+            local_tz = pytz.timezone(self.settings.timezone)
+            local_time = dt.replace(tzinfo=pytz.UTC).astimezone(local_tz)
+            return local_time.strftime("%H:%M Tehran")
+        except Exception:
+            return dt.strftime("%H:%M UTC")
+
+    def _extract_domain(self, url: str) -> str:
+        """Extract domain name from URL."""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc.replace("www.", "")
+            # Shorten common domains
+            if "bloomberg" in domain:
+                return "Bloomberg"
+            elif "reuters" in domain:
+                return "Reuters"
+            elif "cnbc" in domain:
+                return "CNBC"
+            elif "zerohedge" in domain:
+                return "ZeroHedge"
+            elif "wsj" in domain:
+                return "WSJ"
+            elif "ft.com" in domain:
+                return "FT"
+            elif "t.me" in domain:
+                return "Telegram"
+            return domain[:20]
+        except Exception:
+            return "Source"
 
     def _format_assets_with_direction(self, data: AlertData) -> str:
         """Format assets with direction arrows (↑ bullish, ↓ bearish)."""
