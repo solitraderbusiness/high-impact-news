@@ -19,7 +19,6 @@ from radar.detect.rules import RuleMatcher, WatchItemRules
 from radar.detect.llm_openrouter import OpenRouterClient, WatchItemInfo
 from radar.detect.scoring import SeverityScorer
 from radar.detect.dedup import Deduplicator
-from radar.detect.market_relevance import MarketRelevanceFilter
 from radar.notify.telegram import TelegramNotifier, AlertData, AssetWithDirection
 from radar.schemas import CollectionResult, DetectionResult, PipelineRunResult
 from radar.learning import (
@@ -55,7 +54,6 @@ class Pipeline:
             cooldown_minutes=self.settings.default_cooldown_minutes,
         )
         self.notifier = TelegramNotifier()
-        self.market_relevance_filter = MarketRelevanceFilter()
 
         # Learning system components
         self.impact_tracker = ImpactTracker()
@@ -89,7 +87,6 @@ class Pipeline:
                     # Reinitialize components with new settings
                     self.notifier = TelegramNotifier(settings=self.settings)
                     self.llm_client = OpenRouterClient(settings=self.settings)
-                    self.market_relevance_filter = MarketRelevanceFilter(settings=self.settings)
                     logger.debug("settings_refreshed_from_db", keys=list(db_settings.keys()))
 
                 # Step 1: Collect from all sources
@@ -307,31 +304,6 @@ class Pipeline:
 
         # Phase A: Rule-based matching
         text = event.raw_text or event.excerpt or ""
-
-        # Phase 0: Market relevance filter (early filtering)
-        market_relevance = None
-        if self.market_relevance_filter.is_available:
-            market_relevance = self.market_relevance_filter.evaluate(event.title, text)
-            if market_relevance:
-                logger.info(
-                    "market_relevance_evaluated",
-                    event_id=event.id,
-                    is_relevant=market_relevance.is_relevant,
-                    relevance_score=market_relevance.relevance_score,
-                    category=market_relevance.category,
-                )
-                # Skip news that is clearly not market-relevant
-                if market_relevance.relevance_score < 30:
-                    logger.info(
-                        "event_skipped_low_relevance",
-                        event_id=event.id,
-                        title=event.title[:100],
-                        category=market_relevance.category,
-                        relevance_score=market_relevance.relevance_score,
-                    )
-                    storage.mark_event_processed(db, event.id)
-                    return None
-
         matches = self.rule_matcher.match(text, event.title, rules)
 
         best_match = None
@@ -340,9 +312,12 @@ class Pipeline:
         if matches:
             best_match = matches[0]
 
-        # Phase B: LLM analysis
+        # Phase B: LLM analysis (includes market relevance check)
         # Call LLM if: no match, low confidence match, OR we need market analysis
         llm_match = None
+        llm_relevance_score = 100  # Default to relevant if no LLM
+        llm_relevance_category = "market_event"
+
         if self.llm_client.is_available:
             # Always try LLM if we have a match (for market analysis) or need to find a match
             should_try_llm = (
@@ -364,6 +339,33 @@ class Pipeline:
                 ]
 
                 llm_match = self.llm_client.analyze(event.title, text, llm_items)
+
+                if llm_match:
+                    # Extract market relevance from combined LLM analysis
+                    llm_relevance_score = getattr(llm_match, 'relevance_score', 100)
+                    llm_relevance_category = getattr(llm_match, 'relevance_category', 'market_event')
+                    is_relevant = getattr(llm_match, 'is_market_relevant', True)
+
+                    logger.info(
+                        "llm_analysis_complete",
+                        event_id=event.id,
+                        is_relevant=is_relevant,
+                        relevance_score=llm_relevance_score,
+                        category=llm_relevance_category,
+                        has_match=llm_match.watch_item_id is not None,
+                    )
+
+                    # Skip news that LLM determined is not market-relevant
+                    if llm_relevance_score < 30:
+                        logger.info(
+                            "event_skipped_low_relevance",
+                            event_id=event.id,
+                            title=event.title[:100],
+                            category=llm_relevance_category,
+                            relevance_score=llm_relevance_score,
+                        )
+                        storage.mark_event_processed(db, event.id)
+                        return None
 
                 if llm_match and llm_match.watch_item_id:
                     if (llm_match.confidence >= self.settings.llm_confidence_threshold and
@@ -435,20 +437,20 @@ class Pipeline:
                     new_score=adjusted_total,
                 )
 
-        # Apply market relevance adjustment
+        # Apply market relevance adjustment (from combined LLM analysis)
         # This significantly reduces scores for news that isn't actually market-relevant
-        if market_relevance and market_relevance.relevance_score < 70:
+        if llm_relevance_score < 70:
             # Apply a multiplier based on relevance score
-            # relevance 50-69: multiply by 0.6-0.8
+            # relevance 50-69: multiply by 0.5-0.7
             # relevance 30-49: multiply by 0.3-0.5
-            relevance_multiplier = market_relevance.relevance_score / 100
+            relevance_multiplier = llm_relevance_score / 100
             old_score = score_breakdown.total
             score_breakdown.total = int(score_breakdown.total * relevance_multiplier)
             logger.info(
                 "market_relevance_adjustment_applied",
                 event_id=event.id,
-                relevance_score=market_relevance.relevance_score,
-                category=market_relevance.category,
+                relevance_score=llm_relevance_score,
+                category=llm_relevance_category,
                 old_score=old_score,
                 new_score=score_breakdown.total,
             )
@@ -461,15 +463,6 @@ class Pipeline:
         assets_from_match = getattr(best_match, 'assets_affected', None)
         assets_affected = assets_from_match or watch_item.assets_affected or []
         assets_with_impact = getattr(best_match, 'assets_with_impact', [])
-
-        # Use assets from market relevance filter if available and better
-        if market_relevance and market_relevance.suggested_assets:
-            # If no assets from LLM match, use market relevance suggestions
-            if not assets_affected:
-                assets_affected = market_relevance.suggested_assets
-            # Add market relevance reasoning if no other reasoning available
-            if not llm_reasoning and market_relevance.reasoning:
-                llm_reasoning = f"[{market_relevance.category.upper()}] {market_relevance.reasoning}"
 
         # Create detection record
         detection = storage.create_detection(

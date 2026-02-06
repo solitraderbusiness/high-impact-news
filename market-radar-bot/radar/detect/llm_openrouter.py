@@ -34,6 +34,10 @@ class LLMMatch:
     assets_affected: List[str] = field(default_factory=list)
     assets_with_impact: List[AssetImpact] = field(default_factory=list)  # Assets with direction
     market_impact: Optional[str] = None  # Detailed explanation of market impact
+    # Market relevance fields (combined analysis)
+    is_market_relevant: bool = True
+    relevance_score: int = 100
+    relevance_category: str = "market_event"
 
 
 @dataclass
@@ -120,7 +124,7 @@ class OpenRouterClient:
             for w in watch_items
         ])
 
-        prompt = f"""You are a senior financial market analyst at a major investment bank. Analyze the following news article and determine if it relates to any of the monitored entities/topics.
+        prompt = f"""You are a senior financial market analyst at a major investment bank. Analyze the following news article for BOTH market relevance AND entity matching.
 
 MONITORED ENTITIES/TOPICS:
 {items_text}
@@ -131,40 +135,54 @@ ARTICLE TITLE:
 ARTICLE TEXT:
 {truncated_text}
 
-TASK:
-1. Determine which monitored entity/topic (if any) this article is most relevant to.
-2. Extract 1-2 EXACT quotes from the article that support this match. These must be EXACT substrings from the article text - do not paraphrase or modify.
-3. Write a professional analyst-style market impact assessment (5-10 sentences) that includes:
-   - The core event and its immediate significance
-   - Historical context or precedent (if relevant)
-   - First-order effects: direct market impact
-   - Second-order effects: knock-on consequences for related markets
-   - Key risk factors or uncertainties
-   - What traders should watch for (key levels, timing, catalysts)
-4. List specific assets with their expected direction (bullish/bearish).
+TASK - TWO-PART ANALYSIS:
+
+PART 1: MARKET RELEVANCE FILTER
+First, determine if this news is ACTUALLY relevant to financial markets. Ask yourself: "Would a trader at Goldman Sachs care about this?"
+
+HIGH RELEVANCE categories (80-100):
+- central_bank: Fed/ECB/BOJ decisions, statements
+- monetary_policy: Rate decisions, QE/QT, tapering
+- economic_data: GDP, CPI, NFP, PMI releases
+- trade_policy: Tariffs, sanctions, trade deals
+- fiscal_policy: Government spending, taxes, debt
+- market_event: Crashes, circuit breakers, IPOs
+- geopolitical_economic: Wars affecting commodities/supply chains
+
+LOW RELEVANCE categories (0-30) - these do NOT move markets:
+- political_noise: Scandals, investigations, gossip
+- social_issues: HR disputes, discrimination cases
+- entertainment: Celebrity news
+- crime: Non-financial crimes
+
+PART 2: ENTITY MATCHING (only if market-relevant)
+If the news IS market-relevant, determine which monitored entity it relates to.
 
 Respond in JSON format:
 {{
-    "match_id": <id of best matching entity or null if none>,
+    "is_market_relevant": <true/false>,
+    "relevance_score": <0-100>,
+    "relevance_category": "<category from above>",
+    "relevance_reasoning": "<1 sentence why this is/isn't market relevant>",
+    "match_id": <id of best matching entity or null if none/not relevant>,
     "match_name": "<name of matched entity or null>",
     "confidence": <0.0 to 1.0>,
     "citations": ["<exact quote 1>", "<exact quote 2 if relevant>"],
     "reasoning": "<brief one-line summary>",
-    "market_impact": "<ANALYST-STYLE ASSESSMENT: Write 5-10 sentences as a senior financial analyst would. Start with the core significance, then explain the market mechanics (why this moves prices), historical context if relevant, potential second-order effects on related assets, key uncertainties/risks, and what to watch. Be specific about price direction expectations. Do NOT just summarize the headline - provide actionable insight.>",
+    "market_impact": "<ANALYST-STYLE ASSESSMENT: Write 3-5 sentences as a senior financial analyst. Core significance, market mechanics, what to watch. Skip if not market-relevant.>",
     "assets_with_impact": [
         {{"symbol": "EUR", "direction": "bearish"}},
-        {{"symbol": "EURUSD", "direction": "bearish"}},
-        {{"symbol": "German Bunds", "direction": "bullish"}}
+        {{"symbol": "EURUSD", "direction": "bearish"}}
     ]
 }}
 
-IMPORTANT:
-- Citations MUST be exact substrings from the article. Do not modify or paraphrase.
-- Only match if there is a clear, direct connection to the monitored entity.
-- If no match is appropriate, return match_id: null.
-- Confidence should reflect how certain you are of the match.
-- The market_impact field is CRITICAL - write like a Bloomberg or Reuters analyst, not a news summary.
-- For assets_with_impact, use "bullish" for assets expected to rise, "bearish" for those expected to fall, "neutral" if uncertain."""
+CRITICAL RULES:
+- Just because news mentions "Trump" or a famous person does NOT make it market-relevant
+- Political scandals and investigations are usually NOT market-relevant
+- Company HR/discrimination lawsuits are NOT market-relevant
+- Citations MUST be exact substrings from the article
+- If relevance_score < 50, set match_id to null (don't waste effort matching irrelevant news)
+- For assets_with_impact: "bullish" = price up, "bearish" = price down"""
 
         return prompt
 
@@ -226,11 +244,17 @@ IMPORTANT:
 
             data = json.loads(json_match.group())
 
+            # Extract market relevance fields first
+            is_market_relevant = data.get("is_market_relevant", True)
+            relevance_score = int(data.get("relevance_score", 100))
+            relevance_category = data.get("relevance_category", "market_event")
+            relevance_reasoning = data.get("relevance_reasoning", "")
+
             match_id = data.get("match_id")
             match_name = data.get("match_name")
             confidence = float(data.get("confidence", 0))
             citations = data.get("citations", [])
-            reasoning = data.get("reasoning", "")
+            reasoning = data.get("reasoning", "") or relevance_reasoning
             market_impact = data.get("market_impact", "")
 
             # Parse assets with impact direction
@@ -253,8 +277,8 @@ IMPORTANT:
             if not assets_affected:
                 assets_affected = data.get("assets_affected", [])
 
-            # If no match, return early
-            if match_id is None:
+            # If no match or not market relevant, return with relevance info
+            if match_id is None or not is_market_relevant or relevance_score < 50:
                 return LLMMatch(
                     watch_item_id=None,
                     watch_item_name=None,
@@ -262,6 +286,9 @@ IMPORTANT:
                     trigger_spans=[],
                     reasoning=reasoning,
                     assets_affected=[],
+                    is_market_relevant=is_market_relevant,
+                    relevance_score=relevance_score,
+                    relevance_category=relevance_category,
                 )
 
             # Validate that match_id exists in watch_items
@@ -303,6 +330,9 @@ IMPORTANT:
                 assets_affected=assets_affected,
                 assets_with_impact=assets_with_impact,
                 market_impact=market_impact or reasoning,  # Fall back to reasoning if no market_impact
+                is_market_relevant=is_market_relevant,
+                relevance_score=relevance_score,
+                relevance_category=relevance_category,
             )
 
         except json.JSONDecodeError as e:

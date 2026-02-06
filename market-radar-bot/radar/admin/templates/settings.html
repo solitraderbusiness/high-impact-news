@@ -110,15 +110,21 @@
                             {% set current_model = db_settings.get('openrouter_model', current_settings.openrouter_model) %}
                             <optgroup label="💰 Budget (< $1/1M tokens)">
                                 <option value="google/gemini-2.0-flash-001" {% if current_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M</option>
+                                <option value="google/gemini-3-flash-preview" {% if current_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview — $0.15/1M 🆕</option>
                                 <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
+                                <option value="openai/gpt-5-mini" {% if current_model == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini — $0.80/1M 🆕</option>
+                                <option value="openai/gpt-oss-120b" {% if current_model == 'openai/gpt-oss-120b' %}selected{% endif %}>GPT OSS 120B — $0.50/1M 🆕</option>
                                 <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
                             </optgroup>
                             <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
-                                <option value="anthropic/claude-3.5-haiku" {% if current_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M</option>
+                                <option value="deepseek/deepseek-v3.2" {% if current_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 — $1.10/1M 🆕</option>
+                                <option value="x-ai/grok-4.1-fast" {% if current_model == 'x-ai/grok-4.1-fast' %}selected{% endif %}>Grok 4.1 Fast — $2/1M 🆕</option>
                                 <option value="google/gemini-pro-1.5" {% if current_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
+                                <option value="anthropic/claude-3.5-haiku" {% if current_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M</option>
                             </optgroup>
                             <optgroup label="🚀 Premium ($5-20/1M tokens)">
                                 <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
+                                <option value="openai/gpt-5.2" {% if current_model == 'openai/gpt-5.2' %}selected{% endif %}>GPT-5.2 — $12/1M 🆕</option>
                                 <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M</option>
                             </optgroup>
                             <optgroup label="👑 Best Quality ($60+/1M tokens)">
@@ -135,15 +141,21 @@
                             {% set current_trans_model = db_settings.get('translation_model', current_settings.translation_model if current_settings.translation_model else 'anthropic/claude-3-haiku') %}
                             <optgroup label="💰 Budget (< $1/1M tokens)">
                                 <option value="google/gemini-2.0-flash-001" {% if current_trans_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M ⭐ Best Value</option>
+                                <option value="google/gemini-3-flash-preview" {% if current_trans_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview — $0.15/1M 🆕</option>
                                 <option value="openai/gpt-4o-mini" {% if current_trans_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
+                                <option value="openai/gpt-5-mini" {% if current_trans_model == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini — $0.80/1M 🆕</option>
+                                <option value="openai/gpt-oss-120b" {% if current_trans_model == 'openai/gpt-oss-120b' %}selected{% endif %}>GPT OSS 120B — $0.50/1M 🆕</option>
                                 <option value="anthropic/claude-3-haiku" {% if current_trans_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
                             </optgroup>
                             <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
-                                <option value="anthropic/claude-3.5-haiku" {% if current_trans_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M 🎯 Recommended</option>
+                                <option value="deepseek/deepseek-v3.2" {% if current_trans_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 — $1.10/1M 🆕</option>
+                                <option value="x-ai/grok-4.1-fast" {% if current_trans_model == 'x-ai/grok-4.1-fast' %}selected{% endif %}>Grok 4.1 Fast — $2/1M 🆕</option>
                                 <option value="google/gemini-pro-1.5" {% if current_trans_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
+                                <option value="anthropic/claude-3.5-haiku" {% if current_trans_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M 🎯 Recommended</option>
                             </optgroup>
                             <optgroup label="🚀 Premium ($5-20/1M tokens)">
                                 <option value="openai/gpt-4o" {% if current_trans_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
+                                <option value="openai/gpt-5.2" {% if current_trans_model == 'openai/gpt-5.2' %}selected{% endif %}>GPT-5.2 — $12/1M 🆕</option>
                                 <option value="anthropic/claude-3.5-sonnet" {% if current_trans_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M ✨ Best Quality</option>
                             </optgroup>
                             <optgroup label="👑 Best Quality ($60+/1M tokens)">
