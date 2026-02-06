@@ -883,6 +883,62 @@ async def test_telegram(request: Request):
     )
 
 
+@router.post("/settings/deploy")
+async def deploy_updates(request: Request):
+    """Pull latest code and restart service."""
+    import subprocess
+    import os
+
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Look for deploy script in common locations
+    deploy_script = None
+    possible_paths = [
+        os.path.expanduser("~/deploy.sh"),
+        os.path.expanduser("~/high-impact-news/deploy.sh"),
+        "/home/radarbot/deploy.sh",
+    ]
+
+    for path in possible_paths:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            deploy_script = path
+            break
+
+    if not deploy_script:
+        return RedirectResponse(
+            url="/admin/settings?message=Deploy+script+not+found!+Create+~/deploy.sh+first.",
+            status_code=302
+        )
+
+    try:
+        # Run deploy script with timeout
+        result = subprocess.run(
+            [deploy_script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=os.path.dirname(deploy_script),
+        )
+
+        if result.returncode == 0:
+            message = "Deploy+successful!+Service+restarting..."
+        else:
+            error = result.stderr[:100] if result.stderr else "Unknown error"
+            message = f"Deploy+failed:+{error}".replace(" ", "+")
+
+    except subprocess.TimeoutExpired:
+        message = "Deploy+timed+out+(60s)"
+    except Exception as e:
+        message = f"Deploy+error:+{str(e)[:50]}".replace(" ", "+")
+
+    return RedirectResponse(
+        url=f"/admin/settings?message={message}",
+        status_code=302
+    )
+
+
 @router.post("/settings/send-daily-summary")
 async def send_daily_summary(
     request: Request,

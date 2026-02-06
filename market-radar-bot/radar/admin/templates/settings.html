@@ -264,6 +264,39 @@
 </div>
 
 <div class="card">
+    <h2>🚀 Deploy Updates</h2>
+    <p class="text-sm text-muted mb-4">
+        Pull latest code from git and restart the service.
+    </p>
+
+    <form method="POST" action="/admin/settings/deploy" style="display: inline;">
+        <button type="submit" class="btn btn-primary" onclick="return confirm('This will pull latest code and restart the service. Continue?')">
+            🔄 Deploy Now
+        </button>
+    </form>
+
+    <div class="text-sm text-muted mt-4" style="padding: 0.75rem; background: #f8f9fa; border-radius: 6px;">
+        <strong>⚠️ First-time setup required:</strong>
+        <ol style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+            <li>SSH to your server as <code>radarbot</code></li>
+            <li>Create <code>~/deploy.sh</code> with this content:
+                <pre style="background: #e9ecef; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; overflow-x: auto;">#!/bin/bash
+cd ~/high-impact-news
+git pull origin claude/add-admin-pagination-Ua4Cz
+cd market-radar-bot
+source venv/bin/activate
+pip install -e . 2>/dev/null
+sudo systemctl restart market-radar
+echo "Deployed at $(date)"</pre>
+            </li>
+            <li>Make it executable: <code>chmod +x ~/deploy.sh</code></li>
+            <li>Allow passwordless restart: <code>sudo visudo</code> and add:<br>
+                <code>radarbot ALL=(ALL) NOPASSWD: /bin/systemctl restart market-radar</code></li>
+        </ol>
+    </div>
+</div>
+
+<div class="card">
     <h2>📊 Daily Market Summary</h2>
     <p class="text-sm text-muted mb-4">
         Professional analyst-style market sentiment summary with price changes.
