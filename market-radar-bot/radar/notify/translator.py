@@ -90,8 +90,11 @@ IMPORTANT:
             "X-Title": "Market Radar Bot",
         }
 
+        # Use translation_model if set, otherwise fall back to openrouter_model
+        model = getattr(self.settings, 'translation_model', None) or self.settings.openrouter_model
+
         payload = {
-            "model": self.settings.openrouter_model,
+            "model": model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],

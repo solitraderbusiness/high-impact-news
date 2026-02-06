@@ -827,6 +827,7 @@ async def save_settings(
     default_cooldown_minutes: int = Form(...),
     llm_confidence_threshold: float = Form(...),
     openrouter_model: str = Form(...),
+    translation_model: str = Form(...),
     openrouter_api_key: str = Form(""),
     telegram_bot_token: str = Form(""),
     telegram_chat_id: str = Form(""),
@@ -844,7 +845,8 @@ async def save_settings(
     storage.set_app_setting(db, "llm_confidence_threshold", str(llm_confidence_threshold), "Min LLM confidence")
 
     # Save LLM settings
-    storage.set_app_setting(db, "openrouter_model", openrouter_model, "OpenRouter model to use")
+    storage.set_app_setting(db, "openrouter_model", openrouter_model, "OpenRouter model for analysis")
+    storage.set_app_setting(db, "translation_model", translation_model, "OpenRouter model for Persian translation")
     if openrouter_api_key:  # Only update if provided
         storage.set_app_setting(db, "openrouter_api_key", openrouter_api_key, "OpenRouter API key")
 

@@ -98,38 +98,81 @@
     <div class="card">
         <h2>LLM Configuration</h2>
         <p class="text-sm text-muted mb-4">
-            Configure the AI model used for news analysis.
+            Configure the AI models used for news analysis and translation.
         </p>
 
         <table>
             <tbody>
                 <tr>
-                    <td style="width: 200px;"><strong>OpenRouter Model</strong></td>
+                    <td style="width: 200px;"><strong>Analysis Model</strong></td>
                     <td>
-                        <select name="openrouter_model" class="form-input" style="width: 300px;">
+                        <select name="openrouter_model" class="form-input" style="width: 350px;">
                             {% set current_model = db_settings.get('openrouter_model', current_settings.openrouter_model) %}
-                            <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku (Fast, Cheap)</option>
-                            <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet (Balanced)</option>
-                            <option value="anthropic/claude-3-opus" {% if current_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus (Best Quality)</option>
-                            <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini (Fast)</option>
-                            <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o (High Quality)</option>
-                            <option value="google/gemini-pro" {% if current_model == 'google/gemini-pro' %}selected{% endif %}>Gemini Pro</option>
-                            <option value="meta-llama/llama-3-70b-instruct" {% if current_model == 'meta-llama/llama-3-70b-instruct' %}selected{% endif %}>Llama 3 70B</option>
+                            <optgroup label="💰 Budget (< $1/1M tokens)">
+                                <option value="google/gemini-2.0-flash-001" {% if current_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M</option>
+                                <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
+                                <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
+                            </optgroup>
+                            <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
+                                <option value="anthropic/claude-3.5-haiku" {% if current_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M</option>
+                                <option value="google/gemini-pro-1.5" {% if current_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
+                            </optgroup>
+                            <optgroup label="🚀 Premium ($5-20/1M tokens)">
+                                <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
+                                <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M</option>
+                            </optgroup>
+                            <optgroup label="👑 Best Quality ($60+/1M tokens)">
+                                <option value="anthropic/claude-3-opus" {% if current_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus — $75/1M</option>
+                            </optgroup>
                         </select>
                     </td>
-                    <td class="text-sm text-muted">AI model for analyzing news relevance</td>
+                    <td class="text-sm text-muted">For news relevance & market impact analysis</td>
+                </tr>
+                <tr>
+                    <td><strong>Translation Model</strong></td>
+                    <td>
+                        <select name="translation_model" class="form-input" style="width: 350px;">
+                            {% set current_trans_model = db_settings.get('translation_model', current_settings.translation_model if current_settings.translation_model else 'anthropic/claude-3-haiku') %}
+                            <optgroup label="💰 Budget (< $1/1M tokens)">
+                                <option value="google/gemini-2.0-flash-001" {% if current_trans_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M ⭐ Best Value</option>
+                                <option value="openai/gpt-4o-mini" {% if current_trans_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
+                                <option value="anthropic/claude-3-haiku" {% if current_trans_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
+                            </optgroup>
+                            <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
+                                <option value="anthropic/claude-3.5-haiku" {% if current_trans_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M 🎯 Recommended</option>
+                                <option value="google/gemini-pro-1.5" {% if current_trans_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
+                            </optgroup>
+                            <optgroup label="🚀 Premium ($5-20/1M tokens)">
+                                <option value="openai/gpt-4o" {% if current_trans_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
+                                <option value="anthropic/claude-3.5-sonnet" {% if current_trans_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M ✨ Best Quality</option>
+                            </optgroup>
+                            <optgroup label="👑 Best Quality ($60+/1M tokens)">
+                                <option value="anthropic/claude-3-opus" {% if current_trans_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus — $75/1M</option>
+                            </optgroup>
+                        </select>
+                    </td>
+                    <td class="text-sm text-muted">For Persian translation (higher quality = better translations)</td>
                 </tr>
                 <tr>
                     <td><strong>OpenRouter API Key</strong></td>
                     <td>
                         <input type="password" name="openrouter_api_key"
                                value="{{ db_settings.get('openrouter_api_key', '') }}"
-                               placeholder="sk-or-..." class="form-input" style="width: 300px;">
+                               placeholder="sk-or-..." class="form-input" style="width: 350px;">
                     </td>
                     <td class="text-sm text-muted">Leave empty to keep current key</td>
                 </tr>
             </tbody>
         </table>
+
+        <div class="text-sm text-muted mt-4" style="padding: 0.75rem; background: #f8f9fa; border-radius: 6px;">
+            <strong>💡 Tips:</strong>
+            <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+                <li><strong>Translation:</strong> Claude 3.5 Haiku or Sonnet give best Persian quality</li>
+                <li><strong>Analysis:</strong> GPT-4o Mini or Gemini Flash are great for cost-efficiency</li>
+                <li>Prices shown are per 1M output tokens (OpenRouter pricing)</li>
+            </ul>
+        </div>
     </div>
 
     <div class="card">

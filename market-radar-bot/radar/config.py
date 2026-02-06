@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     )
     openrouter_model: str = Field(
         default="anthropic/claude-3-haiku",
-        description="OpenRouter model to use"
+        description="OpenRouter model to use for analysis"
+    )
+    translation_model: str = Field(
+        default="anthropic/claude-3-haiku",
+        description="OpenRouter model to use for Persian translation"
     )
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1",
@@ -148,6 +152,7 @@ def get_settings_with_db_overrides(db_settings: dict) -> Settings:
         "telegram_chat_id": db_settings.get("telegram_chat_id") or base.telegram_chat_id,
         "openrouter_api_key": db_settings.get("openrouter_api_key") or base.openrouter_api_key,
         "openrouter_model": db_settings.get("openrouter_model", base.openrouter_model),
+        "translation_model": db_settings.get("translation_model", base.translation_model),
         "openrouter_base_url": base.openrouter_base_url,
         "alert_threshold": int(db_settings.get("alert_threshold", base.alert_threshold)),
         "digest_threshold": int(db_settings.get("digest_threshold", base.digest_threshold)),
