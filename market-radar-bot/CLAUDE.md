@@ -80,8 +80,8 @@ market-radar-bot/
 │   │   ├── rules.py               # RuleMatcher - keyword/entity matching
 │   │   ├── scoring.py             # SeverityScorer - 0-100 scoring
 │   │   ├── dedup.py               # Deduplicator - hash + cooldown
-│   │   ├── llm_openrouter.py      # OpenRouterClient - LLM fallback
-│   │   └── market_relevance.py    # MarketRelevanceFilter - filters non-market news
+│   │   ├── llm_openrouter.py      # OpenRouterClient - LLM analysis + market relevance
+│   │   └── market_relevance.py    # (Legacy - now integrated into llm_openrouter.py)
 │   │
 │   ├── notify/                    # Notifications
 │   │   ├── __init__.py
@@ -400,11 +400,11 @@ pytest tests/test_scoring.py -v
 - 90+: Bypass cooldown
 - 30-69: Include in digest
 
-### 4. Market Relevance Filter (NEW)
+### 4. Market Relevance Filter (Integrated into LLM Analysis)
 
 **Problem:** Entity matching (e.g., "Donald Trump") flagged all related news as market-relevant, even political gossip and social issues that don't affect prices.
 
-**Solution:** LLM-based content filter that evaluates if news actually impacts financial markets.
+**Solution:** Market relevance check is now **combined into the single LLM analysis call** to save API costs (~30-40% reduction). The LLM evaluates both relevance AND entity matching in one call.
 
 **Categories (High Relevance - 80-100):**
 - `central_bank`: Fed/ECB/BOJ decisions and statements
@@ -430,7 +430,7 @@ pytest tests/test_scoring.py -v
 - "Trump announces new tariffs on China" → trade_policy (90%) → Full score
 - "Epstein investigation update" → political_noise (15%) → Skipped
 
-**Code:** `radar/detect/market_relevance.py`
+**Code:** Market relevance is now in `radar/detect/llm_openrouter.py` (combined prompt)
 
 ### 5. Settings in Database
 
@@ -458,8 +458,9 @@ pytest tests/test_scoring.py -v
 | `radar/services/pipeline.py` | Main orchestration | Adding new pipeline steps |
 | `radar/detect/rules.py` | Keyword/entity matching | Changing match logic |
 | `radar/detect/scoring.py` | Severity calculation | Adjusting scoring |
-| `radar/detect/market_relevance.py` | Market relevance filter | Adjusting relevance categories |
+| `radar/detect/llm_openrouter.py` | LLM analysis + market relevance | Changing relevance categories, prompts |
 | `radar/notify/telegram.py` | Alert formatting | Changing alert format |
+| `radar/notify/translator.py` | Persian translation | Changing translation prompt |
 | `radar/admin/routes.py` | All admin endpoints | Adding admin features |
 | `radar/models.py` | Database schema | Adding new tables/fields |
 | `radar/config.py` | Environment config | Adding new settings |
@@ -580,13 +581,17 @@ Settings are read at startup and cached.
 - [x] Scheduled daily summary
 - [x] Learning system (impact tracking)
 
-### Recent Changes (This Session)
+### Recent Changes
 
 1. **Daily Summary Feature** - LLM-powered end-of-day market wrap
 2. **Scheduled Summary** - Auto-send at configured time (Tehran)
 3. **Professional Formatting** - Analyst-style with confidence indicators
 4. **Logical Consistency** - USD bearish → EURUSD bullish
 5. **Duplicate Prevention** - USD/DXY combined entries
+6. **Market Relevance Filter** - Filters political noise, social issues from alerts
+7. **Combined LLM Analysis** - Relevance check + entity matching in single API call (~30-40% cost savings)
+8. **Separate Translation Model** - Choose different model for Persian translation
+9. **New Models Added** - GPT-5.2, GPT-5-mini, Gemini 3 Flash, DeepSeek V3.2, Grok 4.1 Fast
 
 ### Known Issues
 
@@ -602,7 +607,8 @@ digest_threshold          # int (0-100)
 poll_interval_seconds     # int
 default_cooldown_minutes  # int
 llm_confidence_threshold  # float (0-1)
-openrouter_model          # string
+openrouter_model          # string (for analysis)
+translation_model         # string (for Persian translation)
 openrouter_api_key        # string (sensitive)
 telegram_bot_token        # string (sensitive)
 telegram_chat_id          # string
