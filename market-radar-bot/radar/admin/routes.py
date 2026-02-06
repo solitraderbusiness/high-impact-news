@@ -1214,3 +1214,39 @@ async def export_training_data(
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=training_data.json"}
     )
+
+
+# =============================================================================
+# API Costs
+# =============================================================================
+
+@router.get("/costs", response_class=HTMLResponse)
+async def costs_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    message: Optional[str] = None,
+):
+    """Show API costs page with daily/weekly/monthly breakdown."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Get cost summaries
+    summary = storage.get_api_costs_summary(db)
+    daily_costs = storage.get_api_costs_by_day(db, days=30)
+    by_model = storage.get_api_costs_by_model(db, days=30)
+    by_purpose = storage.get_api_costs_by_purpose(db, days=30)
+    recent_calls = storage.get_recent_api_calls(db, limit=30)
+
+    return templates.TemplateResponse(
+        "costs.html",
+        get_context(
+            request,
+            summary=summary,
+            daily_costs=daily_costs,
+            by_model=by_model,
+            by_purpose=by_purpose,
+            recent_calls=recent_calls,
+            message=message,
+        )
+    )

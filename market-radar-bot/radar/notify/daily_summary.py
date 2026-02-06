@@ -264,6 +264,12 @@ ASSET GUIDELINES:
 
 Remember: Institutional clients will act on this analysis. Be precise and logically consistent."""
 
+        import time
+        from radar.db import get_db_context
+        from radar import storage
+
+        start_time = time.time()
+
         try:
             headers = {
                 "Authorization": f"Bearer {self.settings.openrouter_api_key}",
@@ -287,8 +293,32 @@ Remember: Institutional clients will act on this analysis. Be precise and logica
                 )
                 response.raise_for_status()
 
+            response_time_ms = int((time.time() - start_time) * 1000)
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+
+            # Extract usage info and log it
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            cost_usd = (prompt_tokens + completion_tokens) * 0.000001
+
+            # Log the API usage
+            try:
+                with get_db_context() as db:
+                    storage.log_api_usage(
+                        db=db,
+                        provider="openrouter",
+                        model=self.settings.openrouter_model,
+                        purpose="summary",
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        cost_usd=cost_usd,
+                        response_time_ms=response_time_ms,
+                        is_success=True,
+                    )
+            except Exception as log_error:
+                logger.warning("api_usage_log_failed", error=str(log_error))
 
             # Parse JSON from response
             json_match = re.search(r'\{[\s\S]*\}', content)

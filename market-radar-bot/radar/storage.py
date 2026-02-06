@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from radar.models import (
     WatchItem, Source, SourceState, Event, Detection, AlertSent, AppSettings,
-    watch_item_sources, WatchItemCategory, SourceType
+    watch_item_sources, WatchItemCategory, SourceType, APIUsageLog
 )
 from radar.schemas import (
     WatchItemCreate, WatchItemUpdate,
@@ -736,3 +736,214 @@ def get_recent_alert_titles(
     )
     results = db.execute(query).scalars().all()
     return list(results)
+
+
+# =============================================================================
+# API Usage Tracking
+# =============================================================================
+
+def log_api_usage(
+    db: Session,
+    provider: str,
+    model: str,
+    purpose: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cost_usd: float,
+    response_time_ms: Optional[int] = None,
+    is_success: bool = True,
+    error_message: Optional[str] = None,
+) -> APIUsageLog:
+    """Log an API call with its cost."""
+    log_entry = APIUsageLog(
+        provider=provider,
+        model=model,
+        purpose=purpose,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+        cost_usd=cost_usd,
+        response_time_ms=response_time_ms,
+        is_success=is_success,
+        error_message=error_message,
+    )
+    db.add(log_entry)
+    db.commit()
+    db.refresh(log_entry)
+    return log_entry
+
+
+def get_api_costs_summary(
+    db: Session,
+    days: int = 30,
+) -> dict:
+    """
+    Get API cost summary for today, this week, this month.
+    Returns dict with daily, weekly, monthly totals and breakdowns.
+    """
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())  # Monday
+    month_start = today_start.replace(day=1)
+
+    # Today's cost
+    today_query = select(func.sum(APIUsageLog.cost_usd)).where(
+        APIUsageLog.created_at >= today_start
+    )
+    today_cost = db.execute(today_query).scalar() or 0.0
+
+    # This week's cost
+    week_query = select(func.sum(APIUsageLog.cost_usd)).where(
+        APIUsageLog.created_at >= week_start
+    )
+    week_cost = db.execute(week_query).scalar() or 0.0
+
+    # This month's cost
+    month_query = select(func.sum(APIUsageLog.cost_usd)).where(
+        APIUsageLog.created_at >= month_start
+    )
+    month_cost = db.execute(month_query).scalar() or 0.0
+
+    # Total calls today
+    today_calls_query = select(func.count(APIUsageLog.id)).where(
+        APIUsageLog.created_at >= today_start
+    )
+    today_calls = db.execute(today_calls_query).scalar() or 0
+
+    # Total calls this month
+    month_calls_query = select(func.count(APIUsageLog.id)).where(
+        APIUsageLog.created_at >= month_start
+    )
+    month_calls = db.execute(month_calls_query).scalar() or 0
+
+    return {
+        "today": {
+            "cost": round(today_cost, 4),
+            "calls": today_calls,
+        },
+        "week": {
+            "cost": round(week_cost, 4),
+        },
+        "month": {
+            "cost": round(month_cost, 4),
+            "calls": month_calls,
+        },
+    }
+
+
+def get_api_costs_by_day(
+    db: Session,
+    days: int = 30,
+) -> List[dict]:
+    """Get daily API costs for the past N days."""
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    start_date = (now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Query daily costs
+    query = (
+        select(
+            func.date(APIUsageLog.created_at).label("date"),
+            func.sum(APIUsageLog.cost_usd).label("cost"),
+            func.count(APIUsageLog.id).label("calls"),
+            func.sum(APIUsageLog.total_tokens).label("tokens"),
+        )
+        .where(APIUsageLog.created_at >= start_date)
+        .group_by(func.date(APIUsageLog.created_at))
+        .order_by(func.date(APIUsageLog.created_at).desc())
+    )
+
+    results = db.execute(query).all()
+    return [
+        {
+            "date": str(row.date),
+            "cost": round(row.cost or 0, 4),
+            "calls": row.calls or 0,
+            "tokens": row.tokens or 0,
+        }
+        for row in results
+    ]
+
+
+def get_api_costs_by_model(
+    db: Session,
+    days: int = 30,
+) -> List[dict]:
+    """Get API costs breakdown by model for the past N days."""
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    start_date = (now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    query = (
+        select(
+            APIUsageLog.model,
+            func.sum(APIUsageLog.cost_usd).label("cost"),
+            func.count(APIUsageLog.id).label("calls"),
+            func.sum(APIUsageLog.total_tokens).label("tokens"),
+        )
+        .where(APIUsageLog.created_at >= start_date)
+        .group_by(APIUsageLog.model)
+        .order_by(func.sum(APIUsageLog.cost_usd).desc())
+    )
+
+    results = db.execute(query).all()
+    return [
+        {
+            "model": row.model,
+            "cost": round(row.cost or 0, 4),
+            "calls": row.calls or 0,
+            "tokens": row.tokens or 0,
+        }
+        for row in results
+    ]
+
+
+def get_api_costs_by_purpose(
+    db: Session,
+    days: int = 30,
+) -> List[dict]:
+    """Get API costs breakdown by purpose (analysis, translation, summary)."""
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    start_date = (now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    query = (
+        select(
+            APIUsageLog.purpose,
+            func.sum(APIUsageLog.cost_usd).label("cost"),
+            func.count(APIUsageLog.id).label("calls"),
+            func.sum(APIUsageLog.total_tokens).label("tokens"),
+        )
+        .where(APIUsageLog.created_at >= start_date)
+        .group_by(APIUsageLog.purpose)
+        .order_by(func.sum(APIUsageLog.cost_usd).desc())
+    )
+
+    results = db.execute(query).all()
+    return [
+        {
+            "purpose": row.purpose,
+            "cost": round(row.cost or 0, 4),
+            "calls": row.calls or 0,
+            "tokens": row.tokens or 0,
+        }
+        for row in results
+    ]
+
+
+def get_recent_api_calls(
+    db: Session,
+    limit: int = 50,
+) -> List[APIUsageLog]:
+    """Get recent API calls for display."""
+    query = (
+        select(APIUsageLog)
+        .order_by(APIUsageLog.created_at.desc())
+        .limit(limit)
+    )
+    return list(db.execute(query).scalars().all())

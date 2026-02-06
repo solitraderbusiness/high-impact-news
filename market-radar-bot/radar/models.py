@@ -652,3 +652,42 @@ class LearningConfig(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+
+
+class APIUsageLog(Base):
+    """
+    Tracks API usage and costs for OpenRouter/LLM calls.
+    Used for monitoring spending on API services.
+    """
+    __tablename__ = "api_usage_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # API call details
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # "openrouter"
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # "analysis", "translation", "summary"
+
+    # Token counts
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # Cost in USD (from OpenRouter response)
+    cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    # Response time in milliseconds
+    response_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Success/failure
+    is_success: Mapped[bool] = mapped_column(Boolean, default=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index("ix_api_usage_created_at", "created_at"),
+        Index("ix_api_usage_provider_model", "provider", "model"),
+        Index("ix_api_usage_purpose_date", "purpose", "created_at"),
+    )

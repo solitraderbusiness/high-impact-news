@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}API Costs - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>API Costs</h1>
+
+    {% if message %}
+    <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+
+    <!-- Cost Summary Cards -->
+    <div class="stats-grid" style="margin-bottom: 2rem;">
+        <div class="stat-card">
+            <div class="stat-value" style="color: var(--primary);">${{ "%.4f"|format(summary.today.cost) }}</div>
+            <div class="stat-label">Today</div>
+            <div class="stat-sublabel">{{ summary.today.calls }} calls</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: var(--warning);">${{ "%.4f"|format(summary.week.cost) }}</div>
+            <div class="stat-label">This Week</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: var(--success);">${{ "%.4f"|format(summary.month.cost) }}</div>
+            <div class="stat-label">This Month</div>
+            <div class="stat-sublabel">{{ summary.month.calls }} calls</div>
+        </div>
+    </div>
+
+    <!-- Two-column layout for breakdowns -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+        <!-- Cost by Purpose -->
+        <div class="card">
+            <h2>Cost by Purpose (30 days)</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Purpose</th>
+                        <th style="text-align: right;">Cost</th>
+                        <th style="text-align: right;">Calls</th>
+                        <th style="text-align: right;">Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in by_purpose %}
+                    <tr>
+                        <td>
+                            {% if item.purpose == 'analysis' %}
+                            <span style="color: var(--primary);">Analysis</span>
+                            {% elif item.purpose == 'translation' %}
+                            <span style="color: var(--success);">Translation</span>
+                            {% elif item.purpose == 'summary' %}
+                            <span style="color: var(--warning);">Summary</span>
+                            {% else %}
+                            {{ item.purpose }}
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right;">${{ "%.4f"|format(item.cost) }}</td>
+                        <td style="text-align: right;">{{ item.calls }}</td>
+                        <td style="text-align: right;">{{ "{:,}".format(item.tokens) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">No data yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Cost by Model -->
+        <div class="card">
+            <h2>Cost by Model (30 days)</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th style="text-align: right;">Cost</th>
+                        <th style="text-align: right;">Calls</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in by_model %}
+                    <tr>
+                        <td style="font-size: 0.85rem;">{{ item.model }}</td>
+                        <td style="text-align: right;">${{ "%.4f"|format(item.cost) }}</td>
+                        <td style="text-align: right;">{{ item.calls }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center">No data yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Daily Cost History -->
+    <div class="card">
+        <h2>Daily Cost History</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th style="text-align: right;">Cost</th>
+                    <th style="text-align: right;">API Calls</th>
+                    <th style="text-align: right;">Total Tokens</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in daily_costs %}
+                <tr>
+                    <td>{{ day.date }}</td>
+                    <td style="text-align: right; font-weight: bold;">${{ "%.4f"|format(day.cost) }}</td>
+                    <td style="text-align: right;">{{ day.calls }}</td>
+                    <td style="text-align: right;">{{ "{:,}".format(day.tokens) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">No cost data yet. API calls will be tracked automatically.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recent API Calls -->
+    <div class="card" style="margin-top: 2rem;">
+        <h2>Recent API Calls</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Model</th>
+                    <th>Purpose</th>
+                    <th style="text-align: right;">Tokens</th>
+                    <th style="text-align: right;">Cost</th>
+                    <th style="text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for call in recent_calls %}
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.85rem;">{{ call.created_at|to_tehran }}</td>
+                    <td style="font-size: 0.85rem;">{{ call.model.split('/')[-1][:20] }}</td>
+                    <td>
+                        {% if call.purpose == 'analysis' %}
+                        <span class="badge badge-primary">analysis</span>
+                        {% elif call.purpose == 'translation' %}
+                        <span class="badge badge-success">translation</span>
+                        {% elif call.purpose == 'summary' %}
+                        <span class="badge badge-warning">summary</span>
+                        {% else %}
+                        <span class="badge">{{ call.purpose }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">{{ call.prompt_tokens }} → {{ call.completion_tokens }}</td>
+                    <td style="text-align: right;">${{ "%.5f"|format(call.cost_usd) }}</td>
+                    <td style="text-align: center;">
+                        {% if call.is_success %}
+                        <span style="color: var(--success);">✓</span>
+                        {% else %}
+                        <span style="color: var(--danger);">✗</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No API calls recorded yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top: 2rem; background: var(--gray-100);">
+        <p style="color: var(--gray-500); font-size: 0.9rem;">
+            <strong>Note:</strong> Costs are estimated based on token usage. Actual OpenRouter charges may vary slightly.
+            Check your <a href="https://openrouter.ai/activity" target="_blank">OpenRouter dashboard</a> for exact billing.
+        </p>
+    </div>
+</div>
+
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        color: var(--gray-500);
+        font-weight: 500;
+    }
+
+    .stat-sublabel {
+        color: var(--gray-400);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: var(--gray-200);
+        color: var(--gray-700);
+    }
+
+    .badge-primary {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .badge-success {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .badge-warning {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        div[style*="grid-template-columns: 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+{% endblock %}

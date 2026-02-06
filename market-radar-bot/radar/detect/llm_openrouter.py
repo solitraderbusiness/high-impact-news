@@ -182,8 +182,12 @@ RULES:
 
         return prompt
 
-    def _call_api(self, prompt: str) -> Optional[str]:
-        """Call the OpenRouter API."""
+    def _call_api(self, prompt: str, purpose: str = "analysis") -> Optional[str]:
+        """Call the OpenRouter API and log usage."""
+        import time
+        from radar.db import get_db_context
+        from radar import storage
+
         headers = {
             "Authorization": f"Bearer {self.settings.openrouter_api_key}",
             "Content-Type": "application/json",
@@ -200,6 +204,8 @@ RULES:
             "max_tokens": 1000,
         }
 
+        start_time = time.time()
+
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(
@@ -209,16 +215,70 @@ RULES:
                 )
                 response.raise_for_status()
 
+            response_time_ms = int((time.time() - start_time) * 1000)
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+
+            # Extract usage info and log it
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+
+            # OpenRouter returns cost in the response or we estimate it
+            # Check for cost in response (some models return it)
+            cost_usd = 0.0
+            if "usage" in data and "total_cost" in data["usage"]:
+                cost_usd = data["usage"]["total_cost"]
+            else:
+                # Estimate cost based on typical OpenRouter pricing
+                # Most models: ~$0.001 per 1K tokens average
+                cost_usd = (prompt_tokens + completion_tokens) * 0.000001
+
+            # Log the API usage
+            try:
+                with get_db_context() as db:
+                    storage.log_api_usage(
+                        db=db,
+                        provider="openrouter",
+                        model=self.settings.openrouter_model,
+                        purpose=purpose,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        cost_usd=cost_usd,
+                        response_time_ms=response_time_ms,
+                        is_success=True,
+                    )
+            except Exception as log_error:
+                logger.warning("api_usage_log_failed", error=str(log_error))
+
             return content
 
         except httpx.HTTPStatusError as e:
+            response_time_ms = int((time.time() - start_time) * 1000)
             logger.error(
                 "openrouter_http_error",
                 status=e.response.status_code,
                 body=e.response.text[:500],
             )
+
+            # Log failed API call
+            try:
+                with get_db_context() as db:
+                    storage.log_api_usage(
+                        db=db,
+                        provider="openrouter",
+                        model=self.settings.openrouter_model,
+                        purpose=purpose,
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cost_usd=0.0,
+                        response_time_ms=response_time_ms,
+                        is_success=False,
+                        error_message=f"HTTP {e.response.status_code}",
+                    )
+            except Exception:
+                pass
+
             return None
         except Exception as e:
             logger.error("openrouter_api_error", error=str(e))

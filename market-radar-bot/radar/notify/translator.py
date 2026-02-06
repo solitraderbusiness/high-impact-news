@@ -82,7 +82,11 @@ IMPORTANT:
         return prompt
 
     def _call_api(self, prompt: str) -> Optional[str]:
-        """Call the OpenRouter API."""
+        """Call the OpenRouter API and log usage."""
+        import time
+        from radar.db import get_db_context
+        from radar import storage
+
         headers = {
             "Authorization": f"Bearer {self.settings.openrouter_api_key}",
             "Content-Type": "application/json",
@@ -102,6 +106,8 @@ IMPORTANT:
             "max_tokens": 1000,
         }
 
+        start_time = time.time()
+
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(
@@ -111,16 +117,67 @@ IMPORTANT:
                 )
                 response.raise_for_status()
 
+            response_time_ms = int((time.time() - start_time) * 1000)
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+
+            # Extract usage info and log it
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+
+            # Estimate cost
+            cost_usd = 0.0
+            if "usage" in data and "total_cost" in data["usage"]:
+                cost_usd = data["usage"]["total_cost"]
+            else:
+                cost_usd = (prompt_tokens + completion_tokens) * 0.000001
+
+            # Log the API usage
+            try:
+                with get_db_context() as db:
+                    storage.log_api_usage(
+                        db=db,
+                        provider="openrouter",
+                        model=model,
+                        purpose="translation",
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        cost_usd=cost_usd,
+                        response_time_ms=response_time_ms,
+                        is_success=True,
+                    )
+            except Exception as log_error:
+                logger.warning("api_usage_log_failed", error=str(log_error))
+
             return content
 
         except httpx.HTTPStatusError as e:
+            response_time_ms = int((time.time() - start_time) * 1000)
             logger.error(
                 "translator_http_error",
                 status=e.response.status_code,
                 body=e.response.text[:200],
             )
+
+            # Log failed API call
+            try:
+                with get_db_context() as db:
+                    storage.log_api_usage(
+                        db=db,
+                        provider="openrouter",
+                        model=model,
+                        purpose="translation",
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cost_usd=0.0,
+                        response_time_ms=response_time_ms,
+                        is_success=False,
+                        error_message=f"HTTP {e.response.status_code}",
+                    )
+            except Exception:
+                pass
+
             return None
         except Exception as e:
             logger.error("translator_api_error", error=str(e))
