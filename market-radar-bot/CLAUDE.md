@@ -432,7 +432,61 @@ pytest tests/test_scoring.py -v
 
 **Code:** Market relevance is now in `radar/detect/llm_openrouter.py` (combined prompt)
 
-### 5. Settings in Database
+### 5. Trading-Focused Alert Format
+
+**Old Format (verbose, academic):**
+```
+🟠 IMPORTANT
+█████████████░░░░ 77%
+[Persian title]
+[English title duplicate]
+📊 Entity • category
+💯 Match: 100%
+💹 Affected Assets: [list]
+💡 Analysis: [Long paragraph in Persian]
+[Long paragraph in English]
+```
+
+**New Format (compact, actionable):**
+```
+🟠 IMPORTANT | 77%
+📉 BEARISH ITB
+
+[Persian title only]
+
+📈 XLE
+📉 ITB, XHB, LEN, DHI
+
+📊 Entity | category
+
+⚡ SETUP:
+[What happened and why it matters - 1 sentence]
+
+📍 LEVELS: Support $X, Resistance $Y
+⏱ SWING
+
+👁 WATCH: [Catalyst for confirmation]
+⚠️ RISK: [What invalidates the trade]
+
+🔗 Bloomberg
+🕐 21:13 Tehran
+```
+
+**LLM Prompt Changes:** The LLM now generates:
+- `trade_bias`: BULLISH, BEARISH, or NEUTRAL
+- `primary_asset`: Main asset to trade
+- `setup`: 1-sentence summary
+- `key_levels`: Price levels to watch
+- `timeframe`: INTRADAY, SWING, POSITION
+- `catalyst`: What to watch for confirmation
+- `risk`: What could make this trade wrong
+
+**Files Changed:**
+- `radar/detect/llm_openrouter.py` - New prompt structure
+- `radar/notify/telegram.py` - New format function
+- `radar/services/pipeline.py` - Pass trading fields through
+
+### 6. Settings in Database
 
 **Why:** Change thresholds without restarting service.
 
@@ -458,8 +512,8 @@ pytest tests/test_scoring.py -v
 | `radar/services/pipeline.py` | Main orchestration | Adding new pipeline steps |
 | `radar/detect/rules.py` | Keyword/entity matching | Changing match logic |
 | `radar/detect/scoring.py` | Severity calculation | Adjusting scoring |
-| `radar/detect/llm_openrouter.py` | LLM analysis + market relevance | Changing relevance categories, prompts |
-| `radar/notify/telegram.py` | Alert formatting | Changing alert format |
+| `radar/detect/llm_openrouter.py` | LLM analysis + market relevance + trading setup | Changing prompts, adding new analysis fields |
+| `radar/notify/telegram.py` | Alert formatting (compact trading format) | Changing alert format, adding new sections |
 | `radar/notify/translator.py` | Persian translation | Changing translation prompt |
 | `radar/admin/routes.py` | All admin endpoints | Adding admin features |
 | `radar/models.py` | Database schema | Adding new tables/fields |
@@ -592,6 +646,14 @@ Settings are read at startup and cached.
 7. **Combined LLM Analysis** - Relevance check + entity matching in single API call (~30-40% cost savings)
 8. **Separate Translation Model** - Choose different model for Persian translation
 9. **New Models Added** - GPT-5.2, GPT-5-mini, Gemini 3 Flash, DeepSeek V3.2, Grok 4.1 Fast
+10. **Trading-Focused Alert Format** - Completely redesigned for professional traders:
+    - Trade bias (📈 BULLISH / 📉 BEARISH / ➖ NEUTRAL)
+    - Key price levels to watch
+    - Timeframe (INTRADAY / SWING / POSITION)
+    - Catalyst for confirmation
+    - Risk factors that invalidate the trade
+    - Compact format (Persian title only, no duplication)
+    - Removed visual noise (progress bars, match percentages)
 
 ### Known Issues
 
