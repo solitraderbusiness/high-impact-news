@@ -132,7 +132,7 @@ class OpenRouterClient:
             for w in watch_items
         ])
 
-        prompt = f"""You are a senior trader at Goldman Sachs. Analyze this news for trading opportunities.
+        prompt = f"""You are a senior trader at Goldman Sachs. Analyze this news for HIGH-IMPACT trading opportunities.
 
 MONITORED ENTITIES:
 {items_text}
@@ -144,11 +144,12 @@ ARTICLE:
 
 ANALYSIS REQUIRED:
 
-1. MARKET RELEVANCE - Would this move prices? Score 0-100.
-   HIGH (80-100): Fed/central banks, rate decisions, GDP/CPI/NFP, tariffs, sanctions, geopolitical supply shocks
-   LOW (0-30): Political scandals, HR disputes, celebrity gossip, non-financial crimes
+1. MARKET RELEVANCE - Would this SIGNIFICANTLY move major markets? Score 0-100.
+   HIGH (80-100): Fed rate decisions, major economic data (NFP, CPI, GDP), direct tariffs/sanctions on major economies, war/military action, bank failures
+   MEDIUM (50-79): Secondary economic data, corporate earnings of mega-caps, geopolitical tensions
+   LOW (0-49): Political commentary, sector-specific news, minor policy changes, general news about famous people
 
-2. TRADE SETUP - If relevant, what's the trade?
+2. TRADE SETUP - If relevant, what's the trade on MAJOR LIQUID instruments?
 
 Respond in JSON:
 {{
@@ -161,24 +162,26 @@ Respond in JSON:
     "citations": ["<exact quote from article>"],
 
     "trade_bias": "<BULLISH|BEARISH|NEUTRAL>",
-    "primary_asset": "<main asset to trade, e.g. SPY, DXY, XAUUSD>",
+    "primary_asset": "<MAJOR liquid asset: SPY, QQQ, DXY, EURUSD, USDJPY, XAUUSD, CL, US10Y>",
     "assets_with_impact": [
         {{"symbol": "SPY", "direction": "bullish"}},
-        {{"symbol": "US10Y", "direction": "bearish"}}
+        {{"symbol": "DXY", "direction": "bearish"}}
     ],
 
-    "setup": "<1 sentence: what happened and why it matters>",
-    "key_levels": "<specific price levels to watch, or 'N/A' if not applicable>",
+    "setup": "<1 sentence: what happened and why it matters for prices>",
+    "key_levels": "<specific price levels on primary_asset, or 'N/A'>",
     "timeframe": "<INTRADAY|SWING|POSITION>",
-    "catalyst": "<what to watch for confirmation/invalidation>",
-    "risk": "<what could make this trade wrong>"
+    "catalyst": "<what to watch for confirmation>",
+    "risk": "<what could invalidate this>>"
 }}
 
-RULES:
-- Trump/famous names mentioned ≠ market relevant. Must have ECONOMIC impact.
-- Be specific with levels when possible (e.g., "SPY support at $480, resistance $495")
-- Citations must be EXACT quotes from the article
-- If relevance_score < 50, set match_id to null"""
+CRITICAL RULES:
+- Only score 70+ if news would move SPY/major indices by 0.5%+ or currencies by 0.3%+
+- primary_asset MUST be one of: SPY, QQQ, ES, NQ, DXY, EURUSD, USDJPY, GBPUSD, XAUUSD, CL (crude oil), US10Y, BTC
+- DO NOT suggest sector ETFs (XLE, XLF, ITB, etc.) - only suggest MAJOR liquid instruments
+- Trump/famous names ≠ market relevant. Must have DIRECT economic/policy impact on prices.
+- If relevance_score < 60, set match_id to null
+- Citations must be EXACT quotes from the article"""
 
         return prompt
 
@@ -343,7 +346,8 @@ RULES:
                 assets_affected = data.get("assets_affected", [])
 
             # If no match or not market relevant, return with relevance info
-            if match_id is None or not is_market_relevant or relevance_score < 50:
+            # Threshold raised to 60 to filter out less impactful news
+            if match_id is None or not is_market_relevant or relevance_score < 60:
                 return LLMMatch(
                     watch_item_id=None,
                     watch_item_name=None,

@@ -123,7 +123,7 @@ class TelegramNotifier:
         return self._send_with_retry(message)
 
     def _format_message(self, data: AlertData) -> str:
-        """Format alert data into a compact, actionable Telegram message."""
+        """Format alert data into a compact, actionable Telegram message in Persian."""
         # Severity header
         if data.severity_score >= 90:
             header = "🔴 HIGH IMPACT"
@@ -134,17 +134,17 @@ class TelegramNotifier:
         else:
             header = "🔵 INFO"
 
-        # Trade bias emoji
+        # Trade bias emoji and Persian text
         bias = data.trade_bias.upper() if data.trade_bias else "NEUTRAL"
         if bias == "BULLISH":
             bias_emoji = "📈"
-            bias_text = "BULLISH"
+            bias_text = "صعودی"  # Bullish in Persian
         elif bias == "BEARISH":
             bias_emoji = "📉"
-            bias_text = "BEARISH"
+            bias_text = "نزولی"  # Bearish in Persian
         else:
             bias_emoji = "➖"
-            bias_text = "NEUTRAL"
+            bias_text = "خنثی"  # Neutral in Persian
 
         # Format assets with direction (compact)
         assets_lines = []
@@ -158,16 +158,28 @@ class TelegramNotifier:
         elif data.assets_affected:
             assets_lines.append(f"• {', '.join(data.assets_affected[:4])}")
 
-        assets_text = "\n".join(assets_lines) if assets_lines else "• N/A"
+        assets_text = "\n".join(assets_lines) if assets_lines else ""
 
-        # Translate title to Persian
+        # Translate entire alert content to Persian
         translator = PersianTranslator()
-        translated = translator.translate(data.title, [])
+        translated = translator.translate_alert(
+            title=data.title,
+            setup=data.setup,
+            catalyst=data.catalyst,
+            risk=data.risk,
+        )
 
         if translated:
             title_fa = self._escape_html(translated["title"])
+            setup_fa = self._escape_html(translated.get("setup") or "")
+            catalyst_fa = self._escape_html(translated.get("catalyst") or "")
+            risk_fa = self._escape_html(translated.get("risk") or "")
         else:
+            # Fallback to English if translation fails
             title_fa = self._escape_html(data.title[:150])
+            setup_fa = self._escape_html(data.setup or "")
+            catalyst_fa = self._escape_html(data.catalyst or "")
+            risk_fa = self._escape_html(data.risk or "")
 
         # Format timestamp (Tehran only)
         timestamp = self._format_timestamp_short(data.published_at or datetime.utcnow())
@@ -179,31 +191,38 @@ class TelegramNotifier:
         message = f"""{header} | {data.severity_score}%
 {bias_emoji} <b>{bias_text}</b> {self._escape_html(data.primary_asset or '')}
 
-<b>{title_fa}</b>
+<b>{title_fa}</b>"""
 
-{assets_text}
+        # Add assets if available
+        if assets_text:
+            message += f"\n\n{assets_text}"
 
-📊 {self._escape_html(data.watch_item_name)} | {self._escape_html(data.watch_item_category)}"""
+        message += f"\n\n📊 {self._escape_html(data.watch_item_name)} | {self._escape_html(data.watch_item_category)}"
 
-        # Add setup (what happened)
-        if data.setup:
-            message += f"\n\n⚡ <b>SETUP:</b>\n{self._escape_html(data.setup)}"
+        # Add setup (what happened) - in Persian
+        if setup_fa:
+            message += f"\n\n⚡ <b>تحلیل:</b>\n{setup_fa}"
 
-        # Add key levels if available
+        # Add key levels if available (keep in English - these are numbers)
         if data.key_levels and data.key_levels.lower() not in ['n/a', 'none', '']:
-            message += f"\n\n📍 <b>LEVELS:</b> {self._escape_html(data.key_levels)}"
+            message += f"\n\n📍 <b>سطوح:</b> {self._escape_html(data.key_levels)}"
 
-        # Add timeframe
+        # Add timeframe in Persian
         if data.timeframe:
-            message += f"\n⏱ {self._escape_html(data.timeframe)}"
+            timeframe_fa = {
+                "INTRADAY": "روزانه",
+                "SWING": "میان‌مدت",
+                "POSITION": "بلندمدت"
+            }.get(data.timeframe.upper(), data.timeframe)
+            message += f"\n⏱ {timeframe_fa}"
 
-        # Add catalyst/what to watch
-        if data.catalyst:
-            message += f"\n\n👁 <b>WATCH:</b> {self._escape_html(data.catalyst)}"
+        # Add catalyst/what to watch - in Persian
+        if catalyst_fa:
+            message += f"\n\n👁 <b>نکته مهم:</b> {catalyst_fa}"
 
-        # Add risk
-        if data.risk:
-            message += f"\n⚠️ <b>RISK:</b> {self._escape_html(data.risk)}"
+        # Add risk - in Persian
+        if risk_fa:
+            message += f"\n⚠️ <b>ریسک:</b> {risk_fa}"
 
         # Footer
         message += f"""

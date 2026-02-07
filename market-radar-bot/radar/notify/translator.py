@@ -1,6 +1,6 @@
 """
 Persian translator using OpenRouter LLM.
-Translates news titles and quotes for Telegram alerts.
+Translates news titles and trading analysis for Telegram alerts.
 """
 
 import json
@@ -55,6 +55,40 @@ class PersianTranslator:
             logger.error("translator_error", error=str(e))
             return None
 
+    def translate_alert(
+        self,
+        title: str,
+        setup: Optional[str] = None,
+        catalyst: Optional[str] = None,
+        risk: Optional[str] = None,
+    ) -> Optional[dict]:
+        """
+        Translate entire alert content to Persian in a single call.
+
+        Args:
+            title: News title
+            setup: Trading setup explanation
+            catalyst: What to watch for
+            risk: Risk factors
+
+        Returns:
+            Dict with all translated fields, or None if failed
+        """
+        if not self.is_available:
+            return None
+
+        try:
+            prompt = self._build_alert_prompt(title, setup, catalyst, risk)
+            response = self._call_api(prompt)
+            if not response:
+                return None
+
+            return self._parse_alert_response(response)
+
+        except Exception as e:
+            logger.error("translator_alert_error", error=str(e))
+            return None
+
     def _build_prompt(self, title: str, quotes: list[str]) -> str:
         """Build the translation prompt."""
         quotes_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(quotes)])
@@ -78,6 +112,51 @@ IMPORTANT:
 - Translate naturally, not word-for-word
 - Keep financial/economic terms accurate
 - Do not add any extra text outside the JSON"""
+
+        return prompt
+
+    def _build_alert_prompt(
+        self,
+        title: str,
+        setup: Optional[str],
+        catalyst: Optional[str],
+        risk: Optional[str],
+    ) -> str:
+        """Build prompt for full alert translation."""
+        prompt = f"""ترجمه متن‌های زیر را به فارسی انجام بده. ترجمه باید طبیعی، حرفه‌ای و مناسب اخبار مالی باشد.
+
+TITLE (عنوان خبر):
+{title}
+
+"""
+        if setup:
+            prompt += f"""SETUP (تحلیل معامله):
+{setup}
+
+"""
+        if catalyst:
+            prompt += f"""WATCH (نکته مهم):
+{catalyst}
+
+"""
+        if risk:
+            prompt += f"""RISK (ریسک):
+{risk}
+
+"""
+
+        prompt += """پاسخ را فقط به صورت JSON بده:
+{
+    "title": "<ترجمه فارسی عنوان>",
+    "setup": "<ترجمه فارسی setup یا null>",
+    "catalyst": "<ترجمه فارسی watch یا null>",
+    "risk": "<ترجمه فارسی risk یا null>"
+}
+
+مهم:
+- ترجمه طبیعی باشد، نه کلمه به کلمه
+- اصطلاحات مالی دقیق ترجمه شوند
+- فقط JSON خروجی بده"""
 
         return prompt
 
@@ -210,4 +289,34 @@ IMPORTANT:
             return None
         except Exception as e:
             logger.error("translator_parse_error", error=str(e))
+            return None
+
+    def _parse_alert_response(self, response: str) -> Optional[dict]:
+        """Parse the full alert translation response."""
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if not json_match:
+                logger.warning("translator_no_json_in_alert_response")
+                return None
+
+            data = json.loads(json_match.group())
+
+            title = data.get("title", "")
+
+            if not title:
+                return None
+
+            return {
+                "title": title,
+                "setup": data.get("setup"),
+                "catalyst": data.get("catalyst"),
+                "risk": data.get("risk"),
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error("translator_alert_json_parse_error", error=str(e))
+            return None
+        except Exception as e:
+            logger.error("translator_alert_parse_error", error=str(e))
             return None
