@@ -321,6 +321,39 @@ sudo systemctl start market-radar-web
 sudo systemctl start market-radar-monitor
 ```
 
+### Alternative: Single Combined Service
+
+If you prefer a simpler setup with just one service, you can use `radar run --web` which runs both the monitor AND the web server together:
+
+```bash
+sudo nano /etc/systemd/system/market-radar.service
+```
+
+```ini
+[Unit]
+Description=Market Radar (Web + Monitor)
+After=network.target
+
+[Service]
+Type=simple
+User=your-username
+WorkingDirectory=/home/your-username/apps/market-radar-bot
+Environment="PATH=/home/your-username/apps/market-radar-bot/venv/bin"
+ExecStart=/home/your-username/apps/market-radar-bot/venv/bin/radar run --web
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable market-radar
+sudo systemctl start market-radar
+```
+
 ### Check if They're Running:
 
 ```bash

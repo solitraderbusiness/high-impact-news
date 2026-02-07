@@ -445,7 +445,10 @@ def seed():
 
 @cli.command()
 @click.option("--once", is_flag=True, help="Run collection once and exit")
-def run(once: bool):
+@click.option("--web", is_flag=True, help="Also start the web server")
+@click.option("--host", default=None, help="Web server host (with --web)")
+@click.option("--port", default=None, type=int, help="Web server port (with --web)")
+def run(once: bool, web: bool, host: str, port: int):
     """Run the monitoring pipeline."""
     if once:
         click.echo("Running collection once...")
@@ -464,6 +467,37 @@ def run(once: bool):
                 click.echo(f"    - {err}")
     else:
         click.echo("Starting continuous monitoring...")
+
+        if web:
+            # Start web server in a separate thread
+            import threading
+            import uvicorn
+            from radar.db import init_db
+
+            settings = get_settings()
+            init_db()
+
+            web_host = host or settings.host
+            web_port = port or settings.port
+
+            click.echo(f"Starting web server on {web_host}:{web_port}...")
+
+            # Create uvicorn config and server
+            config = uvicorn.Config(
+                "radar.main:app",
+                host=web_host,
+                port=web_port,
+                reload=False,
+                log_level="info",
+            )
+            server = uvicorn.Server(config)
+
+            # Run web server in background thread
+            web_thread = threading.Thread(target=server.run, daemon=True)
+            web_thread.start()
+
+            click.echo(f"Web server started at http://{web_host}:{web_port}")
+
         click.echo("Press Ctrl+C to stop.\n")
 
         from radar.services.scheduler import run_scheduler
