@@ -1020,6 +1020,10 @@
 
                 <div class="nav-section">
                     <div class="nav-section-title">System</div>
+                    <a href="/admin/docs" class="nav-link {% if request.url.path == '/admin/docs' %}active{% endif %}">
+                        <span class="icon">📚</span>
+                        <span>Documentation</span>
+                    </a>
                     <a href="/admin/settings" class="nav-link {% if request.url.path == '/admin/settings' %}active{% endif %}">
                         <span class="icon">⚙️</span>
                         <span>Settings</span>

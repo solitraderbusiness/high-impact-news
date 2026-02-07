@@ -11,6 +11,7 @@ import pytz
 from fastapi import APIRouter, Depends, Form, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from radar.db import get_db
@@ -20,7 +21,7 @@ from radar.auth import (
     get_current_session, require_auth_redirect
 )
 from radar.config import get_settings
-from radar.models import WatchItemCategory, SourceType, SourceTier, AlertSent
+from radar.models import WatchItemCategory, SourceType, SourceTier, AlertSent, Event, WatchItem, Source
 from radar.schemas import WatchItemCreate, WatchItemUpdate, SourceCreate, SourceUpdate
 from radar.notify.telegram import TelegramNotifier
 from radar.learning import (
@@ -1356,4 +1357,46 @@ async def costs_page(
             recent_calls=recent_calls,
             message=message,
         )
+    )
+
+
+# =============================================================================
+# Documentation
+# =============================================================================
+
+@router.get("/docs", response_class=HTMLResponse)
+async def docs_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Show documentation page."""
+    session = require_auth_redirect(request)
+    if not session:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    # Get today's date range
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Calculate stats for docs page
+    stats = {
+        "watch_items": db.execute(
+            select(func.count(WatchItem.id)).where(WatchItem.is_active == True)
+        ).scalar() or 0,
+        "sources": db.execute(
+            select(func.count(Source.id)).where(Source.is_active == True)
+        ).scalar() or 0,
+        "events_today": db.execute(
+            select(func.count(Event.id)).where(Event.published_at >= today_start)
+        ).scalar() or 0,
+        "alerts_today": db.execute(
+            select(func.count(AlertSent.id)).where(
+                AlertSent.sent_at >= today_start,
+                AlertSent.is_success == True
+            )
+        ).scalar() or 0,
+    }
+
+    return templates.TemplateResponse(
+        "docs.html",
+        get_context(request, stats=stats)
     )

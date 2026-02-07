@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation - Market Radar Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Documentation</h1>
+</div>
+
+<!-- Overview Section -->
+<div class="card">
+    <h2>What is Market Radar Bot?</h2>
+    <p class="text-secondary mb-4">
+        Market Radar Bot is a production-grade system for monitoring market-moving news and sending timely alerts via Telegram.
+        It watches influential people, institutions, central banks, and economic events, detects relevant news using rules + AI,
+        scores severity (0-100), and sends formatted alerts.
+    </p>
+    <div class="section-box">
+        <strong>Key Value:</strong> Get market-moving news alerts before they're priced in.
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.watch_items }}</div>
+        <div class="stat-label">Watch Items</div>
+        <div class="stat-sublabel">Entities being monitored</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">{{ stats.sources }}</div>
+        <div class="stat-label">News Sources</div>
+        <div class="stat-sublabel">RSS, Web, Telegram, X</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">{{ stats.events_today }}</div>
+        <div class="stat-label">Events Today</div>
+        <div class="stat-sublabel">Collected news items</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-value">{{ stats.alerts_today }}</div>
+        <div class="stat-label">Alerts Today</div>
+        <div class="stat-sublabel">Sent to Telegram</div>
+    </div>
+</div>
+
+<!-- How It Works -->
+<div class="card">
+    <h2>How It Works</h2>
+    <div class="docs-flow">
+        <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div class="flow-content">
+                <h3>Collect</h3>
+                <p>Bot polls configured sources (RSS feeds, websites, Telegram channels, X/Twitter accounts) every 60 seconds for new content.</p>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div class="flow-content">
+                <h3>Match</h3>
+                <p>Each news item is matched against Watch Items using keywords and entity matching. The system identifies which entities (people, institutions, events) are mentioned.</p>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div class="flow-content">
+                <h3>Analyze</h3>
+                <p>AI (via OpenRouter) analyzes matched items for market relevance, filters out noise (political gossip, social issues), and generates trading insights.</p>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">4</div>
+            <div class="flow-content">
+                <h3>Score</h3>
+                <p>Each detection gets a severity score (0-100) based on source reliability, recency, keywords, and AI confidence.</p>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">5</div>
+            <div class="flow-content">
+                <h3>Alert</h3>
+                <p>High-severity items (70+) are translated to Persian and sent to Telegram with trade bias, affected assets, and key levels.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Source Types -->
+    <div class="card">
+        <h2>Source Types</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-primary">RSS</span></td>
+                    <td>Standard RSS/Atom feeds from news sites</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-info">Web</span></td>
+                    <td>HTML scraping with CSS selectors</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-success">Telegram</span></td>
+                    <td>Telegram channel messages via t.me/s/</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-warning">X/Twitter</span></td>
+                    <td>X accounts via Nitter RSS (no API needed)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Source Tiers -->
+    <div class="card">
+        <h2>Source Tiers</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tier</th>
+                    <th>Score Bonus</th>
+                    <th>Examples</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-success">Primary</span></td>
+                    <td>+20 points</td>
+                    <td>Reuters, Bloomberg, Fed</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-warning">Secondary</span></td>
+                    <td>+10 points</td>
+                    <td>CNBC, MarketWatch</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-gray">Social</span></td>
+                    <td>+0 points</td>
+                    <td>Zerohedge, WatcherGuru</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Watch Item Categories -->
+<div class="card">
+    <h2>Watch Item Categories</h2>
+    <div class="docs-categories">
+        <div class="category-item">
+            <span class="badge badge-primary">Person</span>
+            <p>Individual decision-makers (Jerome Powell, Christine Lagarde, Elon Musk)</p>
+        </div>
+        <div class="category-item">
+            <span class="badge badge-info">Institution</span>
+            <p>Organizations that move markets (Goldman Sachs, JP Morgan, SEC)</p>
+        </div>
+        <div class="category-item">
+            <span class="badge badge-success">Central Bank</span>
+            <p>Monetary policy makers (Federal Reserve, ECB, BOJ, BOE)</p>
+        </div>
+        <div class="category-item">
+            <span class="badge badge-warning">Event Type</span>
+            <p>Recurring events (FOMC Meeting, NFP Release, CPI Data)</p>
+        </div>
+        <div class="category-item">
+            <span class="badge badge-danger">Macro Release</span>
+            <p>Economic data releases (GDP, Unemployment, PMI)</p>
+        </div>
+        <div class="category-item">
+            <span class="badge badge-gray">Megatrend</span>
+            <p>Long-term themes (AI Revolution, Energy Transition, Deglobalization)</p>
+        </div>
+    </div>
+</div>
+
+<!-- Severity Scoring -->
+<div class="card">
+    <h2>Severity Scoring (0-100)</h2>
+    <p class="text-secondary mb-4">Each detection receives a composite score based on multiple factors:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Factor</th>
+                <th>Points</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Match Confidence</td>
+                <td>0-40</td>
+                <td>How well keywords/entities matched</td>
+            </tr>
+            <tr>
+                <td>Source Tier</td>
+                <td>0-20</td>
+                <td>PRIMARY=20, SECONDARY=10, SOCIAL=0</td>
+            </tr>
+            <tr>
+                <td>Recency</td>
+                <td>0-15</td>
+                <td>Newer content scores higher</td>
+            </tr>
+            <tr>
+                <td>High-Impact Keywords</td>
+                <td>0-25</td>
+                <td>"rate hike", "sanctions", "war", "emergency"</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="section-box mt-4">
+        <div class="flex gap-4 flex-wrap">
+            <div><span class="badge badge-danger">70+</span> Immediate Alert</div>
+            <div><span class="badge badge-warning">90+</span> Bypasses Cooldown</div>
+            <div><span class="badge badge-info">30-69</span> Included in Digest</div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Format -->
+<div class="card">
+    <h2>Alert Format</h2>
+    <p class="text-secondary mb-4">Alerts are designed for professional traders with actionable information:</p>
+
+    <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+🟠 IMPORTANT | 77%
+📉 BEARISH ITB
+
+[Persian headline translation]
+
+📈 XLE
+📉 ITB, XHB, LEN, DHI
+
+📊 Housing Market | macro_release
+
+⚡ SETUP:
+Housing data significantly weaker than expected,
+suggesting continued pressure on homebuilders.
+
+📍 LEVELS: Support $45, Resistance $52
+⏱ SWING
+
+👁 WATCH: Fed commentary on housing
+⚠️ RISK: Broader market rally
+
+🔗 Bloomberg
+🕐 21:13 Tehran</pre>
+</div>
+
+<div class="grid-2">
+    <!-- Features -->
+    <div class="card">
+        <h2>Key Features</h2>
+        <ul class="docs-list">
+            <li><span class="status-dot active"></span>Real-time news monitoring (60s polling)</li>
+            <li><span class="status-dot active"></span>AI-powered market relevance filtering</li>
+            <li><span class="status-dot active"></span>Persian translation for alerts</li>
+            <li><span class="status-dot active"></span>Trading-focused alert format</li>
+            <li><span class="status-dot active"></span>Daily market summary reports</li>
+            <li><span class="status-dot active"></span>1H/4H/Daily sentiment analysis</li>
+            <li><span class="status-dot active"></span>Source reliability tracking</li>
+            <li><span class="status-dot active"></span>API cost monitoring</li>
+            <li><span class="status-dot active"></span>Deduplication (no repeat alerts)</li>
+            <li><span class="status-dot active"></span>Cooldown system (15 min default)</li>
+        </ul>
+    </div>
+
+    <!-- Pre-configured X Accounts -->
+    <div class="card">
+        <h2>Pre-configured X/Twitter Sources</h2>
+        <p class="text-secondary mb-4">25+ accounts ready to add:</p>
+        <ul class="docs-list text-sm">
+            <li><strong>Breaking:</strong> @Reuters, @business, @WSJ, @FT</li>
+            <li><strong>Speed:</strong> @DeItaone, @WatcherGuru</li>
+            <li><strong>Central Banks:</strong> @federalreserve, @ecb, @bankofengland</li>
+            <li><strong>Fed Whisperer:</strong> @NickTimiraos</li>
+            <li><strong>Energy:</strong> @JavierBlas, @OilPriceX</li>
+            <li><strong>Geopolitics:</strong> @AFP, @AP, @BBCBreaking</li>
+            <li><strong>Iran-US:</strong> @IranIntl_En, @BarakRavid</li>
+            <li><strong>Crypto:</strong> @BitcoinMagazine, @zerohedge</li>
+        </ul>
+        <p class="text-muted text-sm mt-4">
+            Run <code>python scripts/add_twitter_sources.py</code> on server to add all.
+        </p>
+    </div>
+</div>
+
+<!-- Admin Panel Guide -->
+<div class="card">
+    <h2>Admin Panel Guide</h2>
+
+    <div class="section-box mb-4">
+        <h3>Watch Items</h3>
+        <p>Configure what entities to monitor. Each watch item has:</p>
+        <ul class="docs-list">
+            <li><strong>Keywords:</strong> Words to match (case-insensitive)</li>
+            <li><strong>Entities:</strong> Exact names to match (case-sensitive)</li>
+            <li><strong>Assets Affected:</strong> What trades when this triggers</li>
+            <li><strong>Cooldown:</strong> Minimum time between alerts</li>
+        </ul>
+    </div>
+
+    <div class="section-box mb-4">
+        <h3>Sources</h3>
+        <p>Configure where to get news. Each source has:</p>
+        <ul class="docs-list">
+            <li><strong>URL:</strong> Feed URL, web page, or @username for X</li>
+            <li><strong>Type:</strong> RSS, Web, Telegram, or Twitter</li>
+            <li><strong>Tier:</strong> Affects severity scoring</li>
+            <li><strong>Global:</strong> Applies to all watch items</li>
+        </ul>
+    </div>
+
+    <div class="section-box mb-4">
+        <h3>Events</h3>
+        <p>View all collected news items with:</p>
+        <ul class="docs-list">
+            <li>Detection status and severity score</li>
+            <li>Test send button to preview alerts</li>
+            <li>Source attribution and timestamps</li>
+        </ul>
+    </div>
+
+    <div class="section-box mb-4">
+        <h3>Settings</h3>
+        <p>Configure system behavior:</p>
+        <ul class="docs-list">
+            <li><strong>Telegram:</strong> Bot token and chat ID</li>
+            <li><strong>Thresholds:</strong> When to send alerts</li>
+            <li><strong>AI Models:</strong> Which LLM for analysis vs translation</li>
+            <li><strong>Schedules:</strong> Daily summary and sentiment reports</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Technical Info -->
+<div class="card">
+    <h2>Technical Information</h2>
+    <div class="grid-2">
+        <div class="section-box">
+            <h3>Stack</h3>
+            <ul class="docs-list text-sm">
+                <li><strong>Backend:</strong> Python 3.11+ / FastAPI</li>
+                <li><strong>Database:</strong> SQLite (dev) / PostgreSQL (prod)</li>
+                <li><strong>ORM:</strong> SQLAlchemy 2.0</li>
+                <li><strong>Scheduler:</strong> APScheduler</li>
+                <li><strong>AI:</strong> OpenRouter API (Claude/GPT)</li>
+            </ul>
+        </div>
+        <div class="section-box">
+            <h3>Server</h3>
+            <ul class="docs-list text-sm">
+                <li><strong>User:</strong> radarbot</li>
+                <li><strong>Service:</strong> systemctl (radarbot.service)</li>
+                <li><strong>Logs:</strong> journalctl -u radarbot -f</li>
+                <li><strong>Admin:</strong> Port 8000</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .docs-flow {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .flow-step {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 12px;
+        border-left: 3px solid var(--primary);
+    }
+
+    .flow-number {
+        width: 36px;
+        height: 36px;
+        background: var(--gradient-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .flow-content h3 {
+        margin-bottom: 0.25rem;
+        color: var(--text-primary);
+    }
+
+    .flow-content p {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .docs-categories {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .category-item {
+        padding: 1rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 10px;
+    }
+
+    .category-item p {
+        margin: 0.5rem 0 0;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .docs-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .docs-list li {
+        padding: 0.5rem 0;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .docs-list li:last-child {
+        border-bottom: none;
+    }
+
+    .text-secondary {
+        color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+        .flow-step {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .docs-categories {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
