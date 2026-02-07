@@ -225,12 +225,14 @@
 
     <div class="section-box mt-4">
         <strong class="text-warning">First-time setup required:</strong>
-        <ol class="text-sm text-muted" style="margin: 0.5rem 0 0 1.5rem;">
-            <li>SSH to your server as <code>radarbot</code></li>
-            <li>Create <code>~/deploy.sh</code> with deploy script</li>
-            <li>Make it executable: <code>chmod +x ~/deploy.sh</code></li>
-            <li>Allow passwordless restart via sudoers</li>
-        </ol>
+        <p class="text-sm text-muted mt-2 mb-2">The deploy.sh script is included in the project. You just need to configure sudoers for passwordless service restart:</p>
+        <pre style="background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 8px; font-size: 0.8rem; overflow-x: auto;">
+# SSH to server and run:
+sudo visudo -f /etc/sudoers.d/radarbot
+
+# Add this line (change 'market-radar' if your service name differs):
+radarbot ALL=(ALL) NOPASSWD: /bin/systemctl restart market-radar</pre>
+        <p class="text-sm text-muted mt-2">After this, the Deploy button will work automatically.</p>
     </div>
 </div>
 

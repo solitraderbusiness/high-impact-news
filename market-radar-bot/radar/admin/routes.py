@@ -896,10 +896,21 @@ async def deploy_updates(request: Request):
 
     # Look for deploy script in common locations
     deploy_script = None
+
+    # Get the project root directory (parent of radar/)
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent.parent
+
     possible_paths = [
-        os.path.expanduser("~/deploy.sh"),
-        os.path.expanduser("~/high-impact-news/deploy.sh"),
+        # Project directory first (most reliable)
+        str(project_root / "deploy.sh"),
+        # Production locations
+        "/home/radarbot/high-impact-news/market-radar-bot/deploy.sh",
+        "/home/radarbot/market-radar-bot/deploy.sh",
         "/home/radarbot/deploy.sh",
+        # User home directory fallback
+        os.path.expanduser("~/deploy.sh"),
+        os.path.expanduser("~/high-impact-news/market-radar-bot/deploy.sh"),
     ]
 
     for path in possible_paths:
@@ -908,26 +919,33 @@ async def deploy_updates(request: Request):
             break
 
     if not deploy_script:
+        # List where we looked
+        paths_checked = ", ".join([p.split("/")[-1] for p in possible_paths[:3]])
         return RedirectResponse(
-            url="/admin/settings?message=Deploy+script+not+found!+Create+~/deploy.sh+first.",
+            url=f"/admin/settings?message=Deploy+script+not+found.+Expected+at:{str(project_root / 'deploy.sh').replace(' ', '+')}",
             status_code=302
         )
 
     try:
-        # Run deploy script with timeout
+        # Run deploy script with timeout from the script's directory
+        script_dir = os.path.dirname(deploy_script)
         result = subprocess.run(
-            [deploy_script],
+            ["/bin/bash", deploy_script],
             capture_output=True,
             text=True,
-            timeout=60,
-            cwd=os.path.dirname(deploy_script),
+            timeout=120,  # 2 minutes for git operations
+            cwd=script_dir,
+            env={**os.environ, "HOME": os.path.expanduser("~")},
         )
 
         if result.returncode == 0:
             message = "Deploy+successful!+Service+restarting..."
         else:
-            error = result.stderr[:100] if result.stderr else "Unknown error"
-            message = f"Deploy+failed:+{error}".replace(" ", "+")
+            # Get meaningful error from stderr or stdout
+            error_output = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+            # Take last line which usually has the actual error
+            error_line = error_output.split("\n")[-1][:80]
+            message = f"Deploy+failed:+{error_line}".replace(" ", "+").replace(":", "%3A")
 
     except subprocess.TimeoutExpired:
         message = "Deploy+timed+out+(60s)"
