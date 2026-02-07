@@ -46,28 +46,28 @@ market-radar-bot/
 │   ├── cli.py                     # Click CLI commands
 │   ├── config.py                  # Pydantic Settings (env vars)
 │   ├── db.py                      # SQLAlchemy engine, sessions
-│   ├── models.py                  # 13 ORM models
+│   ├── models.py                  # 14 ORM models
 │   ├── schemas.py                 # Pydantic request/response schemas
 │   ├── storage.py                 # CRUD operations
 │   ├── auth.py                    # Session-based authentication
 │   │
-│   ├── admin/                     # Web admin panel
+│   ├── admin/                     # Web admin panel (Modern Dark Theme)
 │   │   ├── __init__.py
-│   │   ├── routes.py              # All admin routes (1000+ lines)
+│   │   ├── routes.py              # All admin routes (1200+ lines)
 │   │   ├── templates/             # Jinja2 HTML templates
-│   │   │   ├── base.html          # Base template with nav
-│   │   │   ├── login.html
+│   │   │   ├── base.html          # Dark theme base with sidebar nav
+│   │   │   ├── login.html         # Glassmorphism login page
 │   │   │   ├── watch_items.html
 │   │   │   ├── watch_item_edit.html
 │   │   │   ├── sources.html
 │   │   │   ├── source_edit.html
 │   │   │   ├── events.html
 │   │   │   ├── alerts.html
-│   │   │   ├── settings.html
-│   │   │   ├── learning.html
-│   │   │   └── ...
+│   │   │   ├── settings.html      # Includes sentiment schedule
+│   │   │   ├── costs.html         # API cost tracking
+│   │   │   └── learning.html
 │   │   └── static/
-│   │       └── styles.css
+│   │       └── styles.css         # (CSS now embedded in base.html)
 │   │
 │   ├── collectors/                # Data collection
 │   │   ├── __init__.py
@@ -87,11 +87,12 @@ market-radar-bot/
 │   │   ├── __init__.py
 │   │   ├── telegram.py            # TelegramNotifier - send alerts
 │   │   ├── daily_summary.py       # DailySummaryGenerator - LLM summaries
+│   │   ├── sentiment_analyzer.py  # MarketSentimentAnalyzer - periodic sentiment
 │   │   └── translator.py          # PersianTranslator
 │   │
 │   ├── services/                  # Background services
 │   │   ├── __init__.py
-│   │   ├── pipeline.py            # Pipeline - main orchestration
+│   │   ├── pipeline.py            # Pipeline - main orchestration + Twitter/Nitter
 │   │   └── scheduler.py           # Scheduler - APScheduler wrapper
 │   │
 │   └── learning/                  # ML/Learning system
@@ -101,6 +102,9 @@ market-radar-bot/
 │       ├── price_fetcher.py       # PriceFetcher - get prices
 │       ├── history_recorder.py    # HistoryRecorder - ML training data
 │       └── source_discovery.py    # SourceDiscovery - auto-find sources
+│
+├── scripts/                        # Utility scripts
+│   └── add_twitter_sources.py     # Pre-configured X/Twitter accounts
 │
 ├── tests/
 │   ├── test_scoring.py
@@ -146,7 +150,7 @@ watch_item_sources # Links watch items to sources
 
 ```python
 WatchItemCategory = person | institution | central_bank | event_type | macro_release | megatrend
-SourceType = rss | web | telegram
+SourceType = rss | web | telegram | twitter  # Twitter uses Nitter RSS
 SourceTier = primary | secondary | social
 ```
 
@@ -225,6 +229,13 @@ POST /admin/settings/save                  → Save all settings
 POST /admin/settings/test-telegram         → Send test message
 POST /admin/settings/send-daily-summary    → Generate & send summary
 POST /admin/settings/save-summary-schedule → Save auto-schedule
+POST /admin/settings/save-sentiment-schedule → Save sentiment schedule (1H/4H/Daily)
+POST /admin/settings/send-sentiment        → Send sentiment report now
+```
+
+**API Costs:**
+```
+GET  /admin/costs                          → API cost tracking page
 ```
 
 **Learning:**
@@ -327,6 +338,20 @@ radar serve
 
 ### Running as Service
 
+**Production Server User:** `radarbot`
+
+The production server runs as the `radarbot` user. All file operations and service management should be done as this user.
+
+```bash
+# Switch to radarbot user
+sudo su - radarbot
+
+# Or run commands as radarbot
+sudo -u radarbot <command>
+```
+
+**Systemd Service Configuration:**
+
 ```bash
 # Create systemd service
 sudo nano /etc/systemd/system/radarbot.service
@@ -340,9 +365,10 @@ After=network.target
 [Service]
 Type=simple
 User=radarbot
-WorkingDirectory=/home/user/high-impact-news/market-radar-bot
-Environment=PATH=/home/user/high-impact-news/market-radar-bot/venv/bin
-ExecStart=/home/user/high-impact-news/market-radar-bot/venv/bin/radar run
+Group=radarbot
+WorkingDirectory=/home/radarbot/high-impact-news/market-radar-bot
+Environment=PATH=/home/radarbot/high-impact-news/market-radar-bot/venv/bin
+ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar run
 Restart=always
 RestartSec=10
 
@@ -355,6 +381,27 @@ sudo systemctl daemon-reload
 sudo systemctl enable radarbot
 sudo systemctl start radarbot
 sudo systemctl status radarbot
+```
+
+**Web Admin Service (optional - if running separately):**
+
+```ini
+[Unit]
+Description=Market Radar Admin Panel
+After=network.target
+
+[Service]
+Type=simple
+User=radarbot
+Group=radarbot
+WorkingDirectory=/home/radarbot/high-impact-news/market-radar-bot
+Environment=PATH=/home/radarbot/high-impact-news/market-radar-bot/venv/bin
+ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar serve
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ### Testing
@@ -501,6 +548,98 @@ pytest tests/test_scoring.py -v
 
 **Usage:** Adjusts severity scores based on source track record.
 
+### 7. X/Twitter Source Integration via Nitter
+
+**Problem:** X/Twitter has valuable real-time financial news but requires paid API.
+
+**Solution:** Use Nitter RSS feeds - free, no API key required.
+
+**How It Works:**
+1. Add source with `SourceType.TWITTER` and URL as `@username`
+2. Pipeline converts `@username` to Nitter RSS: `https://nitter.privacydev.net/username/rss`
+3. Standard RSS collection handles the rest
+
+**Code Location:** `radar/services/pipeline.py` - `_get_nitter_url()` method
+
+**Nitter Instances (fallback order):**
+1. `nitter.privacydev.net`
+2. `nitter.poast.org`
+3. `nitter.net`
+
+**Pre-configured Accounts:** Run `scripts/add_twitter_sources.py` to add 25+ accounts:
+- **Breaking News:** @Reuters, @business, @WSJ, @FT, @CNBC, @MarketWatch
+- **Speed/Headlines:** @DeItaone (Walter Bloomberg), @WatcherGuru
+- **Central Banks:** @federalreserve, @ecb, @bankofengland, @NickTimiraos
+- **Energy/Oil:** @JavierBlas, @OilPriceX
+- **Geopolitics:** @AFP, @AP, @BBCBreaking, @spectatorindex, @IntelCrab
+- **Iran-US/Middle East:** @IranIntl_En, @BarakRavid, @AliVaez, @farnaz_fassihi
+- **Crypto:** @BitcoinMagazine, @zerohedge
+
+**Adding Twitter Sources Manually:**
+```python
+from radar.schemas import SourceCreate
+from radar.models import SourceType, SourceTier
+from radar import storage
+from radar.db import get_db_context
+
+with get_db_context() as db:
+    source = SourceCreate(
+        name="Reuters",
+        url="@Reuters",  # Just the @username
+        source_type=SourceType.TWITTER,
+        tier=SourceTier.PRIMARY,
+        is_global=True,
+        is_active=True,
+    )
+    storage.create_source(db, source)
+```
+
+### 8. Market Sentiment Analyzer
+
+**Purpose:** Scheduled market sentiment reports (1H, 4H, Daily) summarizing recent events.
+
+**Features:**
+- Configurable schedules in admin panel
+- Groups events by asset category
+- Provides overall market sentiment (Bullish/Bearish/Neutral)
+- Key events summary with trading implications
+
+**Settings:**
+```
+sentiment_1h_enabled    # "1" or "0"
+sentiment_4h_enabled    # "1" or "0"
+sentiment_daily_enabled # "1" or "0"
+```
+
+**Code Location:** `radar/notify/sentiment_analyzer.py`
+
+### 9. Modern Admin UI Design
+
+**Design System:** Vision UI inspired dark theme with glassmorphism effects.
+
+**Features:**
+- Fixed sidebar navigation with icons
+- Dark gradient background (#0f0c29 → #302b63 → #24243e)
+- Glassmorphism cards (frosted glass effect)
+- Responsive mobile design with hamburger menu
+- Modern form styling with focus states
+- Color-coded badges and stat cards
+
+**CSS Variables:**
+```css
+--bg-primary: #1a1a2e
+--bg-secondary: #16213e
+--bg-card: rgba(255, 255, 255, 0.05)
+--text-primary: #ffffff
+--text-secondary: rgba(255, 255, 255, 0.7)
+--accent: #4f46e5
+--success: #10b981
+--warning: #f59e0b
+--danger: #ef4444
+```
+
+**Template Structure:** All CSS is embedded in `base.html` for simplicity.
+
 ---
 
 ## Key Files to Know
@@ -509,24 +648,30 @@ pytest tests/test_scoring.py -v
 
 | File | What It Does | When to Edit |
 |------|--------------|--------------|
-| `radar/services/pipeline.py` | Main orchestration | Adding new pipeline steps |
+| `radar/services/pipeline.py` | Main orchestration + Twitter/Nitter handling | Adding new pipeline steps, new source types |
 | `radar/detect/rules.py` | Keyword/entity matching | Changing match logic |
 | `radar/detect/scoring.py` | Severity calculation | Adjusting scoring |
 | `radar/detect/llm_openrouter.py` | LLM analysis + market relevance + trading setup | Changing prompts, adding new analysis fields |
 | `radar/notify/telegram.py` | Alert formatting (compact trading format) | Changing alert format, adding new sections |
+| `radar/notify/sentiment_analyzer.py` | Market sentiment reports | Changing sentiment analysis |
 | `radar/notify/translator.py` | Persian translation | Changing translation prompt |
 | `radar/admin/routes.py` | All admin endpoints | Adding admin features |
+| `radar/admin/templates/base.html` | Modern dark theme UI, sidebar nav | Changing admin styling |
 | `radar/models.py` | Database schema | Adding new tables/fields |
 | `radar/config.py` | Environment config | Adding new settings |
+| `scripts/add_twitter_sources.py` | Pre-configured X accounts | Adding new Twitter sources |
 
 ### Template Files
 
 | Template | Purpose |
 |----------|---------|
-| `templates/base.html` | Navigation, CSS includes |
-| `templates/settings.html` | Config UI, daily summary |
+| `templates/base.html` | Dark theme base, sidebar navigation, all CSS embedded |
+| `templates/login.html` | Glassmorphism login with animated background |
+| `templates/settings.html` | Config UI, daily summary, sentiment schedule |
+| `templates/costs.html` | API cost tracking and breakdown |
 | `templates/events.html` | Event list with test-send |
 | `templates/watch_item_edit.html` | Complex form with JSON |
+| `templates/learning.html` | ML learning system, source reliability |
 
 ---
 
@@ -660,6 +805,23 @@ Settings are read at startup and cached.
     - Cost breakdown by model
     - Recent API calls table with token counts
     - All API calls (analysis, translation, summary) are logged automatically
+12. **X/Twitter Source Support** - Add X accounts as news sources:
+    - New `SourceType.TWITTER` enum value
+    - Automatic Nitter RSS conversion (no API key needed)
+    - Pre-configured with 25+ financial/geopolitical accounts
+    - Run `scripts/add_twitter_sources.py` to populate
+13. **Market Sentiment Analyzer** - Scheduled sentiment reports:
+    - 1-hour, 4-hour, and daily sentiment analysis
+    - Configurable in admin settings panel
+    - Groups events by asset category
+    - Overall market mood indicator
+14. **Modern Admin UI Redesign** - Complete visual overhaul:
+    - Vision UI inspired dark theme
+    - Glassmorphism effects (frosted glass cards)
+    - Fixed sidebar navigation with icons
+    - Animated login page
+    - Mobile-responsive with hamburger menu
+    - All functionality preserved from previous design
 
 ### Known Issues
 
@@ -684,6 +846,9 @@ daily_summary_enabled     # "1" or "0"
 daily_summary_time        # "HH:MM" format
 daily_summary_hours       # "12", "24", or "48"
 daily_summary_last_sent   # "YYYY-MM-DD" (auto-set)
+sentiment_1h_enabled      # "1" or "0" - hourly sentiment
+sentiment_4h_enabled      # "1" or "0" - 4-hour sentiment
+sentiment_daily_enabled   # "1" or "0" - daily sentiment
 ```
 
 ---
@@ -756,14 +921,18 @@ with get_db_context() as db:
 # View logs
 sudo journalctl -u radarbot -f
 
+# View last 100 lines
+sudo journalctl -u radarbot -n 100
+
 # Check database
 sqlite3 market_radar.db ".tables"
 sqlite3 market_radar.db "SELECT * FROM app_settings"
+sqlite3 market_radar.db "SELECT name, source_type, is_active FROM sources"
 
 # Quick test
 radar run --once
 
-# Python shell with context
+# Python shell with context (development)
 cd /home/user/high-impact-news/market-radar-bot
 source venv/bin/activate
 python
@@ -771,6 +940,103 @@ python
 >>> from radar import storage
 >>> with get_db_context() as db:
 ...     print(storage.get_stats(db))
+
+# Python shell (production - as radarbot user)
+sudo su - radarbot
+cd /home/radarbot/high-impact-news/market-radar-bot
+source venv/bin/activate
+python
+
+# Add Twitter sources (run on server after deployment)
+cd /home/radarbot/high-impact-news/market-radar-bot
+source venv/bin/activate
+python scripts/add_twitter_sources.py
+
+# Restart service after changes
+sudo systemctl restart radarbot
+```
+
+---
+
+## Scripts Directory
+
+### `scripts/add_twitter_sources.py`
+
+Populates the database with 25+ pre-configured X/Twitter accounts for financial news.
+
+**Categories:**
+- Financial Markets (Reuters, Bloomberg, WSJ, FT, CNBC, MarketWatch)
+- Speed/Headlines (DeItaone, WatcherGuru)
+- Central Banks (Fed, ECB, BOE, Nick Timiraos)
+- Commodities/Energy (Javier Blas, OilPrice)
+- Geopolitics (AFP, AP, BBC Breaking, Intel Crab)
+- Iran-US/Middle East (Iran International, Barak Ravid, etc.)
+- Crypto (Bitcoin Magazine, Zerohedge)
+
+**Usage:**
+```bash
+# On production server
+sudo su - radarbot
+cd /home/radarbot/high-impact-news/market-radar-bot
+source venv/bin/activate
+python scripts/add_twitter_sources.py
+```
+
+**Output:**
+```
+ADD: Reuters (@Reuters) - ID: 45
+ADD: Bloomberg (@business) - ID: 46
+SKIP: Wall Street Journal - already exists
+...
+Done! Added 23 sources, skipped 2 duplicates.
+```
+
+---
+
+## Deployment Notes
+
+### Server Access
+
+```bash
+# SSH to server
+ssh radarbot@<server-ip>
+
+# Or switch to radarbot after SSH
+sudo su - radarbot
+```
+
+### Project Location
+
+- **Development:** `/home/user/high-impact-news/market-radar-bot`
+- **Production:** `/home/radarbot/high-impact-news/market-radar-bot`
+
+### Git Backup Tags
+
+Before major changes, backup tags are created:
+
+```bash
+# List backup tags
+git tag -l "backup-*"
+
+# Restore to backup if needed
+git checkout backup-before-ui-redesign
+
+# Current backups:
+# - backup-before-ui-redesign (before Vision UI dark theme)
+```
+
+### Updating Production
+
+```bash
+# On server as radarbot user
+cd /home/radarbot/high-impact-news/market-radar-bot
+git pull origin main
+
+# Restart service
+sudo systemctl restart radarbot
+
+# Check logs
+sudo journalctl -u radarbot -f
 ```
 
 ---
@@ -778,6 +1044,8 @@ python
 ## Contact & Resources
 
 - **Admin Panel:** http://localhost:8000/admin/
+- **Production Admin:** http://<server-ip>:8000/admin/
 - **Health Check:** http://localhost:8000/health
 - **Logs:** `journalctl -u radarbot -f`
 - **Database:** `market_radar.db` (SQLite)
+- **OpenRouter Dashboard:** https://openrouter.ai/activity (for API costs)
