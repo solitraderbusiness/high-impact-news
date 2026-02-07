@@ -209,6 +209,15 @@ class Pipeline:
                 last_modified=last_modified,
                 last_published_at=last_published,
             )
+        elif source.source_type == SourceType.TWITTER:
+            # Convert Twitter @username or URL to Nitter RSS
+            nitter_url = self._get_nitter_url(source.url)
+            items, new_etag, new_modified = self.rss_collector.collect(
+                nitter_url,
+                etag=etag,
+                last_modified=last_modified,
+                last_published_at=last_published,
+            )
         elif source.source_type == SourceType.WEB:
             item, new_etag, new_modified = self.web_collector.collect(
                 source.url,
@@ -546,6 +555,32 @@ class Pipeline:
             trigger_spans=best_match.trigger_spans,
             is_alerted=is_alerted,
         )
+
+    def _get_nitter_url(self, twitter_url: str) -> str:
+        """Convert Twitter @username or URL to Nitter RSS URL."""
+        # Nitter instances (try multiple in case one is down)
+        nitter_instances = [
+            "nitter.privacydev.net",
+            "nitter.poast.org",
+            "nitter.net",
+        ]
+
+        # Extract username from various formats
+        username = twitter_url.strip()
+
+        # Handle @username format
+        if username.startswith("@"):
+            username = username[1:]
+        # Handle full Twitter/X URLs
+        elif "twitter.com/" in username or "x.com/" in username:
+            # Extract username from URL like https://twitter.com/Reuters or https://x.com/Reuters
+            import re
+            match = re.search(r'(?:twitter\.com|x\.com)/([^/?#]+)', username)
+            if match:
+                username = match.group(1)
+
+        # Use first Nitter instance (could rotate on failures)
+        return f"https://{nitter_instances[0]}/{username}/rss"
 
     def _get_relevant_watch_items(
         self,

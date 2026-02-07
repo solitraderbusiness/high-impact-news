@@ -40,6 +40,7 @@ class SourceType(str, enum.Enum):
     RSS = "rss"
     WEB = "web"
     TELEGRAM = "telegram"
+    TWITTER = "twitter"  # X/Twitter accounts via Nitter RSS
 
 
 class SourceTier(str, enum.Enum):
