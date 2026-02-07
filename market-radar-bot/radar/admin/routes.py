@@ -902,15 +902,14 @@ async def deploy_updates(request: Request):
     project_root = Path(__file__).parent.parent.parent
 
     possible_paths = [
-        # Project directory first (most reliable)
+        # User's home directory first (existing setup)
+        "/home/radarbot/deploy.sh",
+        os.path.expanduser("~/deploy.sh"),
+        # Project directory
         str(project_root / "deploy.sh"),
-        # Production locations
+        # Other production locations
         "/home/radarbot/high-impact-news/market-radar-bot/deploy.sh",
         "/home/radarbot/market-radar-bot/deploy.sh",
-        "/home/radarbot/deploy.sh",
-        # User home directory fallback
-        os.path.expanduser("~/deploy.sh"),
-        os.path.expanduser("~/high-impact-news/market-radar-bot/deploy.sh"),
     ]
 
     for path in possible_paths:
