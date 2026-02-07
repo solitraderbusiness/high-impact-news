@@ -320,8 +320,11 @@ radar init-db
 # Seed with sample data (20+ watch items, sources)
 radar seed
 
-# Run continuous monitoring
+# Run continuous monitoring (scheduler only)
 radar run
+
+# Run monitoring + web server together (recommended for single service)
+radar run --web
 
 # Run once (for testing)
 radar run --once
@@ -332,7 +335,7 @@ radar collect
 # Test Telegram
 radar send-test
 
-# Start web server (admin panel)
+# Start web server only (admin panel)
 radar serve
 ```
 
@@ -350,16 +353,18 @@ sudo su - radarbot
 sudo -u radarbot <command>
 ```
 
-**Systemd Service Configuration:**
+**Systemd Service Configuration (Combined - Recommended):**
+
+Uses `radar run --web` to run both the monitoring scheduler AND web server in a single service:
 
 ```bash
 # Create systemd service
-sudo nano /etc/systemd/system/radarbot.service
+sudo nano /etc/systemd/system/market-radar.service
 ```
 
 ```ini
 [Unit]
-Description=Market Radar Bot
+Description=Market Radar Bot (Web + Monitor)
 After=network.target
 
 [Service]
@@ -368,7 +373,7 @@ User=radarbot
 Group=radarbot
 WorkingDirectory=/home/radarbot/high-impact-news/market-radar-bot
 Environment=PATH=/home/radarbot/high-impact-news/market-radar-bot/venv/bin
-ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar run
+ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar run --web
 Restart=always
 RestartSec=10
 
@@ -378,14 +383,15 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable radarbot
-sudo systemctl start radarbot
-sudo systemctl status radarbot
+sudo systemctl enable market-radar
+sudo systemctl start market-radar
+sudo systemctl status market-radar
 ```
 
-**Web Admin Service (optional - if running separately):**
+**Alternative: Separate Services (if you need them on different ports/configs):**
 
 ```ini
+# /etc/systemd/system/market-radar-web.service
 [Unit]
 Description=Market Radar Admin Panel
 After=network.target
@@ -397,6 +403,26 @@ Group=radarbot
 WorkingDirectory=/home/radarbot/high-impact-news/market-radar-bot
 Environment=PATH=/home/radarbot/high-impact-news/market-radar-bot/venv/bin
 ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar serve
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```ini
+# /etc/systemd/system/market-radar-monitor.service
+[Unit]
+Description=Market Radar Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=radarbot
+Group=radarbot
+WorkingDirectory=/home/radarbot/high-impact-news/market-radar-bot
+Environment=PATH=/home/radarbot/high-impact-news/market-radar-bot/venv/bin
+ExecStart=/home/radarbot/high-impact-news/market-radar-bot/venv/bin/radar run
 Restart=always
 RestartSec=10
 
@@ -748,7 +774,7 @@ In daily summary, "USD (DXY)" is a combined entry. Code must handle both separat
 
 After changing settings in admin panel, restart the service:
 ```bash
-sudo systemctl restart radarbot
+sudo systemctl restart market-radar
 ```
 
 Settings are read at startup and cached.
@@ -919,10 +945,10 @@ with get_db_context() as db:
 
 ```bash
 # View logs
-sudo journalctl -u radarbot -f
+sudo journalctl -u market-radar -f
 
 # View last 100 lines
-sudo journalctl -u radarbot -n 100
+sudo journalctl -u market-radar -n 100
 
 # Check database
 sqlite3 market_radar.db ".tables"
@@ -953,7 +979,7 @@ source venv/bin/activate
 python scripts/add_twitter_sources.py
 
 # Restart service after changes
-sudo systemctl restart radarbot
+sudo systemctl restart market-radar
 ```
 
 ---
@@ -1033,10 +1059,10 @@ cd /home/radarbot/high-impact-news/market-radar-bot
 git pull origin main
 
 # Restart service
-sudo systemctl restart radarbot
+sudo systemctl restart market-radar
 
 # Check logs
-sudo journalctl -u radarbot -f
+sudo journalctl -u market-radar -f
 ```
 
 ---
@@ -1046,6 +1072,6 @@ sudo journalctl -u radarbot -f
 - **Admin Panel:** http://localhost:8000/admin/
 - **Production Admin:** http://<server-ip>:8000/admin/
 - **Health Check:** http://localhost:8000/health
-- **Logs:** `journalctl -u radarbot -f`
+- **Logs:** `journalctl -u market-radar -f`
 - **Database:** `market_radar.db` (SQLite)
 - **OpenRouter Dashboard:** https://openrouter.ai/activity (for API costs)
