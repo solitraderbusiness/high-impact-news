@@ -4,7 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Market Radar Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #0f0c29;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-input: rgba(255, 255, 255, 0.07);
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary: #667eea;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.5);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow-button: 0 4px 15px rgba(102, 126, 234, 0.4);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --danger: #f45c43;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -12,95 +29,203 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1rem;
+        }
+
+        /* Animated background circles */
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        body::before {
+            width: 400px;
+            height: 400px;
+            background: #667eea;
+            top: -100px;
+            right: -100px;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        body::after {
+            width: 300px;
+            height: 300px;
+            background: #764ba2;
+            bottom: -100px;
+            left: -100px;
+            animation: float 10s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, 30px) scale(1.1); }
         }
 
         .login-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 2.5rem;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
+            box-shadow: var(--shadow-card);
         }
 
         .logo {
             text-align: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .logo-icon {
+            width: 70px;
+            height: 70px;
+            background: var(--gradient-primary);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1rem;
+            box-shadow: var(--shadow-button);
         }
 
         .logo h1 {
-            font-size: 1.5rem;
-            color: #1e3a5f;
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.25rem;
         }
 
         .logo p {
-            color: #6b7280;
-            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
         }
 
         label {
             display: block;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
             font-weight: 500;
             font-size: 0.875rem;
-            color: #374151;
+            color: var(--text-secondary);
         }
 
         input[type="text"],
         input[type="password"] {
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
             font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
         }
 
         input:focus {
             outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
         }
 
         .btn {
             width: 100%;
-            padding: 0.75rem;
-            background: #2563eb;
+            padding: 0.875rem;
+            background: var(--gradient-primary);
             color: white;
             border: none;
-            border-radius: 0.375rem;
+            border-radius: 12px;
             font-size: 1rem;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            box-shadow: var(--shadow-button);
+            margin-top: 0.5rem;
         }
 
         .btn:hover {
-            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(0);
         }
 
         .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            margin-bottom: 1rem;
-            font-size: 0.875rem;
+            background: rgba(244, 92, 67, 0.1);
+            border: 1px solid rgba(244, 92, 67, 0.3);
+            color: var(--danger);
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .error::before {
+            content: '⚠️';
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 2rem 1.5rem;
+                border-radius: 20px;
+            }
+
+            .logo-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.75rem;
+            }
+
+            .logo h1 {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="logo">
+            <div class="logo-icon">📡</div>
             <h1>Market Radar</h1>
             <p>Admin Panel</p>
         </div>
@@ -112,16 +237,20 @@
         <form method="POST" action="/admin/login">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autofocus>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
             </div>
 
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
 
             <button type="submit" class="btn">Sign In</button>
         </form>
+
+        <div class="footer-text">
+            Secure access to your trading radar
+        </div>
     </div>
 </body>
 </html>

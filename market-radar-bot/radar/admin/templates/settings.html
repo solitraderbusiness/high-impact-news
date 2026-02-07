@@ -3,7 +3,7 @@
 {% block title %}Settings - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>Settings</h1>
 </div>
 
@@ -18,15 +18,15 @@
         <div class="stat-value">{{ stats.watch_items_count }}</div>
         <div class="stat-label">Watch Items</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card info">
         <div class="stat-value">{{ stats.sources_count }}</div>
         <div class="stat-label">Sources</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card success">
         <div class="stat-value">{{ stats.events_count }}</div>
         <div class="stat-label">Events</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card warning">
         <div class="stat-value">{{ stats.detections_count }}</div>
         <div class="stat-label">Detections</div>
     </div>
@@ -44,55 +44,43 @@
             These settings control how news is detected and when alerts are sent.
         </p>
 
-        <table>
-            <tbody>
-                <tr>
-                    <td style="width: 200px;"><strong>Alert Threshold</strong></td>
-                    <td style="width: 150px;">
-                        <input type="number" name="alert_threshold"
-                               value="{{ db_settings.get('alert_threshold', current_settings.alert_threshold) }}"
-                               min="0" max="100" class="form-input" style="width: 80px;">
-                    </td>
-                    <td class="text-sm text-muted">Severity score (0-100) above which immediate alerts are sent</td>
-                </tr>
-                <tr>
-                    <td><strong>Digest Threshold</strong></td>
-                    <td>
-                        <input type="number" name="digest_threshold"
-                               value="{{ db_settings.get('digest_threshold', current_settings.digest_threshold) }}"
-                               min="0" max="100" class="form-input" style="width: 80px;">
-                    </td>
-                    <td class="text-sm text-muted">Severity score for digest inclusion</td>
-                </tr>
-                <tr>
-                    <td><strong>Poll Interval</strong></td>
-                    <td>
-                        <input type="number" name="poll_interval_seconds"
-                               value="{{ db_settings.get('poll_interval_seconds', current_settings.poll_interval_seconds) }}"
-                               min="10" max="3600" class="form-input" style="width: 80px;"> sec
-                    </td>
-                    <td class="text-sm text-muted">How often sources are polled (minimum 10 seconds)</td>
-                </tr>
-                <tr>
-                    <td><strong>Default Cooldown</strong></td>
-                    <td>
-                        <input type="number" name="default_cooldown_minutes"
-                               value="{{ db_settings.get('default_cooldown_minutes', current_settings.default_cooldown_minutes) }}"
-                               min="1" max="1440" class="form-input" style="width: 80px;"> min
-                    </td>
-                    <td class="text-sm text-muted">Time between alerts for same watch item</td>
-                </tr>
-                <tr>
-                    <td><strong>LLM Confidence</strong></td>
-                    <td>
-                        <input type="number" name="llm_confidence_threshold"
-                               value="{{ db_settings.get('llm_confidence_threshold', current_settings.llm_confidence_threshold) }}"
-                               min="0" max="1" step="0.05" class="form-input" style="width: 80px;">
-                    </td>
-                    <td class="text-sm text-muted">Minimum confidence for LLM matches (0.0-1.0)</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Alert Threshold</label>
+                <input type="number" name="alert_threshold"
+                       value="{{ db_settings.get('alert_threshold', current_settings.alert_threshold) }}"
+                       min="0" max="100" class="form-input" style="width: 100px;">
+                <div class="help-text">Severity score (0-100) above which immediate alerts are sent</div>
+            </div>
+            <div class="form-group">
+                <label>Digest Threshold</label>
+                <input type="number" name="digest_threshold"
+                       value="{{ db_settings.get('digest_threshold', current_settings.digest_threshold) }}"
+                       min="0" max="100" class="form-input" style="width: 100px;">
+                <div class="help-text">Severity score for digest inclusion</div>
+            </div>
+            <div class="form-group">
+                <label>Poll Interval (seconds)</label>
+                <input type="number" name="poll_interval_seconds"
+                       value="{{ db_settings.get('poll_interval_seconds', current_settings.poll_interval_seconds) }}"
+                       min="10" max="3600" class="form-input" style="width: 100px;">
+                <div class="help-text">How often sources are polled (minimum 10 seconds)</div>
+            </div>
+            <div class="form-group">
+                <label>Default Cooldown (minutes)</label>
+                <input type="number" name="default_cooldown_minutes"
+                       value="{{ db_settings.get('default_cooldown_minutes', current_settings.default_cooldown_minutes) }}"
+                       min="1" max="1440" class="form-input" style="width: 100px;">
+                <div class="help-text">Time between alerts for same watch item</div>
+            </div>
+            <div class="form-group">
+                <label>LLM Confidence Threshold</label>
+                <input type="number" name="llm_confidence_threshold"
+                       value="{{ db_settings.get('llm_confidence_threshold', current_settings.llm_confidence_threshold) }}"
+                       min="0" max="1" step="0.05" class="form-input" style="width: 100px;">
+                <div class="help-text">Minimum confidence for LLM matches (0.0-1.0)</div>
+            </div>
+        </div>
     </div>
 
     <div class="card">
@@ -101,383 +89,269 @@
             Configure the AI models used for news analysis and translation.
         </p>
 
-        <table>
-            <tbody>
-                <tr>
-                    <td style="width: 200px;"><strong>Analysis Model</strong></td>
-                    <td>
-                        <select name="openrouter_model" class="form-input" style="width: 350px;">
-                            {% set current_model = db_settings.get('openrouter_model', current_settings.openrouter_model) %}
-                            <optgroup label="💰 Budget (< $1/1M tokens)">
-                                <option value="google/gemini-2.0-flash-001" {% if current_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M</option>
-                                <option value="google/gemini-3-flash-preview" {% if current_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview — $0.15/1M 🆕</option>
-                                <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
-                                <option value="openai/gpt-5-mini" {% if current_model == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini — $0.80/1M 🆕</option>
-                                <option value="openai/gpt-oss-120b" {% if current_model == 'openai/gpt-oss-120b' %}selected{% endif %}>GPT OSS 120B — $0.50/1M 🆕</option>
-                                <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
-                            </optgroup>
-                            <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
-                                <option value="deepseek/deepseek-v3.2" {% if current_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 — $1.10/1M 🆕</option>
-                                <option value="x-ai/grok-4.1-fast" {% if current_model == 'x-ai/grok-4.1-fast' %}selected{% endif %}>Grok 4.1 Fast — $2/1M 🆕</option>
-                                <option value="google/gemini-pro-1.5" {% if current_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
-                                <option value="anthropic/claude-3.5-haiku" {% if current_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M</option>
-                            </optgroup>
-                            <optgroup label="🚀 Premium ($5-20/1M tokens)">
-                                <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
-                                <option value="openai/gpt-5.2" {% if current_model == 'openai/gpt-5.2' %}selected{% endif %}>GPT-5.2 — $12/1M 🆕</option>
-                                <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M</option>
-                            </optgroup>
-                            <optgroup label="👑 Best Quality ($60+/1M tokens)">
-                                <option value="anthropic/claude-3-opus" {% if current_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus — $75/1M</option>
-                            </optgroup>
-                        </select>
-                    </td>
-                    <td class="text-sm text-muted">For news relevance & market impact analysis</td>
-                </tr>
-                <tr>
-                    <td><strong>Translation Model</strong></td>
-                    <td>
-                        <select name="translation_model" class="form-input" style="width: 350px;">
-                            {% set current_trans_model = db_settings.get('translation_model', current_settings.translation_model if current_settings.translation_model else 'anthropic/claude-3-haiku') %}
-                            <optgroup label="💰 Budget (< $1/1M tokens)">
-                                <option value="google/gemini-2.0-flash-001" {% if current_trans_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash — $0.10/1M ⭐ Best Value</option>
-                                <option value="google/gemini-3-flash-preview" {% if current_trans_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview — $0.15/1M 🆕</option>
-                                <option value="openai/gpt-4o-mini" {% if current_trans_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini — $0.60/1M</option>
-                                <option value="openai/gpt-5-mini" {% if current_trans_model == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini — $0.80/1M 🆕</option>
-                                <option value="openai/gpt-oss-120b" {% if current_trans_model == 'openai/gpt-oss-120b' %}selected{% endif %}>GPT OSS 120B — $0.50/1M 🆕</option>
-                                <option value="anthropic/claude-3-haiku" {% if current_trans_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku — $1.25/1M</option>
-                            </optgroup>
-                            <optgroup label="⚖️ Balanced ($1-5/1M tokens)">
-                                <option value="deepseek/deepseek-v3.2" {% if current_trans_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 — $1.10/1M 🆕</option>
-                                <option value="x-ai/grok-4.1-fast" {% if current_trans_model == 'x-ai/grok-4.1-fast' %}selected{% endif %}>Grok 4.1 Fast — $2/1M 🆕</option>
-                                <option value="google/gemini-pro-1.5" {% if current_trans_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro — $2.50/1M</option>
-                                <option value="anthropic/claude-3.5-haiku" {% if current_trans_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku — $4/1M 🎯 Recommended</option>
-                            </optgroup>
-                            <optgroup label="🚀 Premium ($5-20/1M tokens)">
-                                <option value="openai/gpt-4o" {% if current_trans_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o — $10/1M</option>
-                                <option value="openai/gpt-5.2" {% if current_trans_model == 'openai/gpt-5.2' %}selected{% endif %}>GPT-5.2 — $12/1M 🆕</option>
-                                <option value="anthropic/claude-3.5-sonnet" {% if current_trans_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet — $15/1M ✨ Best Quality</option>
-                            </optgroup>
-                            <optgroup label="👑 Best Quality ($60+/1M tokens)">
-                                <option value="anthropic/claude-3-opus" {% if current_trans_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus — $75/1M</option>
-                            </optgroup>
-                        </select>
-                    </td>
-                    <td class="text-sm text-muted">For Persian translation (higher quality = better translations)</td>
-                </tr>
-                <tr>
-                    <td><strong>OpenRouter API Key</strong></td>
-                    <td>
-                        <input type="password" name="openrouter_api_key"
-                               value="{{ db_settings.get('openrouter_api_key', '') }}"
-                               placeholder="sk-or-..." class="form-input" style="width: 350px;">
-                    </td>
-                    <td class="text-sm text-muted">Leave empty to keep current key</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="form-group">
+            <label>Analysis Model</label>
+            <select name="openrouter_model" style="max-width: 400px;">
+                {% set current_model = db_settings.get('openrouter_model', current_settings.openrouter_model) %}
+                <optgroup label="Budget (< $1/1M tokens)">
+                    <option value="google/gemini-2.0-flash-001" {% if current_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash - $0.10/1M</option>
+                    <option value="google/gemini-3-flash-preview" {% if current_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview - $0.15/1M</option>
+                    <option value="openai/gpt-4o-mini" {% if current_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini - $0.60/1M</option>
+                    <option value="openai/gpt-5-mini" {% if current_model == 'openai/gpt-5-mini' %}selected{% endif %}>GPT-5 Mini - $0.80/1M</option>
+                    <option value="anthropic/claude-3-haiku" {% if current_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku - $1.25/1M</option>
+                </optgroup>
+                <optgroup label="Balanced ($1-5/1M tokens)">
+                    <option value="deepseek/deepseek-v3.2" {% if current_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 - $1.10/1M</option>
+                    <option value="x-ai/grok-4.1-fast" {% if current_model == 'x-ai/grok-4.1-fast' %}selected{% endif %}>Grok 4.1 Fast - $2/1M</option>
+                    <option value="google/gemini-pro-1.5" {% if current_model == 'google/gemini-pro-1.5' %}selected{% endif %}>Gemini 1.5 Pro - $2.50/1M</option>
+                    <option value="anthropic/claude-3.5-haiku" {% if current_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku - $4/1M</option>
+                </optgroup>
+                <optgroup label="Premium ($5-20/1M tokens)">
+                    <option value="openai/gpt-4o" {% if current_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o - $10/1M</option>
+                    <option value="openai/gpt-5.2" {% if current_model == 'openai/gpt-5.2' %}selected{% endif %}>GPT-5.2 - $12/1M</option>
+                    <option value="anthropic/claude-3.5-sonnet" {% if current_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet - $15/1M</option>
+                </optgroup>
+                <optgroup label="Best Quality ($60+/1M tokens)">
+                    <option value="anthropic/claude-3-opus" {% if current_model == 'anthropic/claude-3-opus' %}selected{% endif %}>Claude 3 Opus - $75/1M</option>
+                </optgroup>
+            </select>
+            <div class="help-text">For news relevance & market impact analysis</div>
+        </div>
 
-        <div class="text-sm text-muted mt-4" style="padding: 0.75rem; background: #f8f9fa; border-radius: 6px;">
-            <strong>💡 Tips:</strong>
-            <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
-                <li><strong>Translation:</strong> Claude 3.5 Haiku or Sonnet give best Persian quality</li>
-                <li><strong>Analysis:</strong> GPT-4o Mini or Gemini Flash are great for cost-efficiency</li>
-                <li>Prices shown are per 1M output tokens (OpenRouter pricing)</li>
-            </ul>
+        <div class="form-group">
+            <label>Translation Model</label>
+            <select name="translation_model" style="max-width: 400px;">
+                {% set current_trans_model = db_settings.get('translation_model', current_settings.translation_model if current_settings.translation_model else 'anthropic/claude-3-haiku') %}
+                <optgroup label="Budget (< $1/1M tokens)">
+                    <option value="google/gemini-2.0-flash-001" {% if current_trans_model == 'google/gemini-2.0-flash-001' %}selected{% endif %}>Gemini 2.0 Flash - $0.10/1M (Best Value)</option>
+                    <option value="google/gemini-3-flash-preview" {% if current_trans_model == 'google/gemini-3-flash-preview' %}selected{% endif %}>Gemini 3 Flash Preview - $0.15/1M</option>
+                    <option value="openai/gpt-4o-mini" {% if current_trans_model == 'openai/gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini - $0.60/1M</option>
+                    <option value="anthropic/claude-3-haiku" {% if current_trans_model == 'anthropic/claude-3-haiku' %}selected{% endif %}>Claude 3 Haiku - $1.25/1M</option>
+                </optgroup>
+                <optgroup label="Balanced ($1-5/1M tokens)">
+                    <option value="deepseek/deepseek-v3.2" {% if current_trans_model == 'deepseek/deepseek-v3.2' %}selected{% endif %}>DeepSeek V3.2 - $1.10/1M</option>
+                    <option value="anthropic/claude-3.5-haiku" {% if current_trans_model == 'anthropic/claude-3.5-haiku' %}selected{% endif %}>Claude 3.5 Haiku - $4/1M (Recommended)</option>
+                </optgroup>
+                <optgroup label="Premium ($5-20/1M tokens)">
+                    <option value="openai/gpt-4o" {% if current_trans_model == 'openai/gpt-4o' %}selected{% endif %}>GPT-4o - $10/1M</option>
+                    <option value="anthropic/claude-3.5-sonnet" {% if current_trans_model == 'anthropic/claude-3.5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet - $15/1M (Best Quality)</option>
+                </optgroup>
+            </select>
+            <div class="help-text">For Persian translation (higher quality = better translations)</div>
+        </div>
+
+        <div class="form-group">
+            <label>OpenRouter API Key</label>
+            <input type="password" name="openrouter_api_key"
+                   value="{{ db_settings.get('openrouter_api_key', '') }}"
+                   placeholder="sk-or-..." style="max-width: 400px;">
+            <div class="help-text">Leave empty to keep current key</div>
         </div>
     </div>
 
     <div class="card">
         <h2>Telegram Configuration</h2>
-        <p class="text-sm text-muted mb-4">
-            Configure where alerts are sent.
-        </p>
+        <p class="text-sm text-muted mb-4">Configure where alerts are sent.</p>
 
-        <table>
-            <tbody>
-                <tr>
-                    <td style="width: 200px;"><strong>Bot Token</strong></td>
-                    <td>
-                        <input type="password" name="telegram_bot_token"
-                               value="{{ db_settings.get('telegram_bot_token', '') }}"
-                               placeholder="123456:ABC-DEF..." class="form-input" style="width: 300px;">
-                    </td>
-                    <td class="text-sm text-muted">Telegram bot token from @BotFather</td>
-                </tr>
-                <tr>
-                    <td><strong>Channel/Chat ID</strong></td>
-                    <td>
-                        <input type="text" name="telegram_chat_id"
-                               value="{{ db_settings.get('telegram_chat_id', '') }}"
-                               placeholder="-100123456789 or @channelname" class="form-input" style="width: 300px;">
-                    </td>
-                    <td class="text-sm text-muted">Channel ID (starts with -100) or @username</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Bot Token</label>
+                <input type="password" name="telegram_bot_token"
+                       value="{{ db_settings.get('telegram_bot_token', '') }}"
+                       placeholder="123456:ABC-DEF...">
+                <div class="help-text">Telegram bot token from @BotFather</div>
+            </div>
+            <div class="form-group">
+                <label>Channel/Chat ID</label>
+                <input type="text" name="telegram_chat_id"
+                       value="{{ db_settings.get('telegram_chat_id', '') }}"
+                       placeholder="-100123456789 or @channelname">
+                <div class="help-text">Channel ID (starts with -100) or @username</div>
+            </div>
+        </div>
     </div>
 
     <div class="flex gap-2 mb-4">
         <button type="submit" class="btn btn-primary">Save Settings</button>
-        <span class="text-sm text-muted" style="line-height: 36px;">Changes take effect after service restart</span>
+        <span class="text-sm text-muted" style="line-height: 40px;">Changes take effect after service restart</span>
     </div>
 </form>
 
 <div class="card">
     <h2>Integration Status</h2>
-    <table>
-        <tbody>
-            <tr>
-                <td style="width: 200px;"><strong>Telegram</strong></td>
-                <td>
+    <div class="grid-2">
+        <div class="section-box">
+            <div class="flex justify-between items-center">
+                <div>
+                    <strong>Telegram</strong>
                     {% if current_settings.has_telegram or db_settings.get('telegram_bot_token') %}
-                        <span class="badge badge-success">Configured</span>
+                        <span class="badge badge-success" style="margin-left: 0.5rem;">Configured</span>
                     {% else %}
-                        <span class="badge badge-warning">Not Configured</span>
+                        <span class="badge badge-warning" style="margin-left: 0.5rem;">Not Configured</span>
                     {% endif %}
-                </td>
-                <td>
-                    {% if current_settings.has_telegram or db_settings.get('telegram_bot_token') %}
-                        <form method="POST" action="/admin/settings/test-telegram" style="display: inline;">
-                            <button type="submit" class="btn btn-secondary btn-sm">Send Test Message</button>
-                        </form>
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td><strong>OpenRouter LLM</strong></td>
-                <td>
-                    {% if current_settings.has_openrouter or db_settings.get('openrouter_api_key') %}
-                        <span class="badge badge-success">Configured</span>
-                    {% else %}
-                        <span class="badge badge-gray">Not Configured (Rules Only)</span>
-                    {% endif %}
-                </td>
-                <td class="text-sm text-muted">
-                    {% if current_settings.has_openrouter or db_settings.get('openrouter_api_key') %}
+                </div>
+                {% if current_settings.has_telegram or db_settings.get('telegram_bot_token') %}
+                <form method="POST" action="/admin/settings/test-telegram" style="display: inline;">
+                    <button type="submit" class="btn btn-secondary btn-sm">Send Test</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="section-box">
+            <div>
+                <strong>OpenRouter LLM</strong>
+                {% if current_settings.has_openrouter or db_settings.get('openrouter_api_key') %}
+                    <span class="badge badge-success" style="margin-left: 0.5rem;">Configured</span>
+                    <div class="text-sm text-muted mt-2">
                         Model: {{ db_settings.get('openrouter_model', current_settings.openrouter_model) }}
-                    {% endif %}
-                </td>
-            </tr>
-        </tbody>
-    </table>
+                    </div>
+                {% else %}
+                    <span class="badge badge-gray" style="margin-left: 0.5rem;">Rules Only</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
-    <h2>🚀 Deploy Updates</h2>
-    <p class="text-sm text-muted mb-4">
-        Pull latest code from git and restart the service.
-    </p>
+    <h2>Deploy Updates</h2>
+    <p class="text-sm text-muted mb-4">Pull latest code from git and restart the service.</p>
 
     <form method="POST" action="/admin/settings/deploy" style="display: inline;">
         <button type="submit" class="btn btn-primary" onclick="return confirm('This will pull latest code and restart the service. Continue?')">
-            🔄 Deploy Now
+            Deploy Now
         </button>
     </form>
 
-    <div class="text-sm text-muted mt-4" style="padding: 0.75rem; background: #f8f9fa; border-radius: 6px;">
-        <strong>⚠️ First-time setup required:</strong>
-        <ol style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+    <div class="section-box mt-4">
+        <strong class="text-warning">First-time setup required:</strong>
+        <ol class="text-sm text-muted" style="margin: 0.5rem 0 0 1.5rem;">
             <li>SSH to your server as <code>radarbot</code></li>
-            <li>Create <code>~/deploy.sh</code> with this content:
-                <pre style="background: #e9ecef; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; overflow-x: auto;">#!/bin/bash
-cd ~/high-impact-news
-git pull origin claude/add-admin-pagination-Ua4Cz
-cd market-radar-bot
-source venv/bin/activate
-pip install -e . 2>/dev/null
-sudo systemctl restart market-radar
-echo "Deployed at $(date)"</pre>
-            </li>
+            <li>Create <code>~/deploy.sh</code> with deploy script</li>
             <li>Make it executable: <code>chmod +x ~/deploy.sh</code></li>
-            <li>Allow passwordless restart: <code>sudo visudo</code> and add:<br>
-                <code>radarbot ALL=(ALL) NOPASSWD: /bin/systemctl restart market-radar</code></li>
+            <li>Allow passwordless restart via sudoers</li>
         </ol>
     </div>
 </div>
 
 <div class="card">
-    <h2>📊 Daily Market Summary</h2>
-    <p class="text-sm text-muted mb-4">
-        Professional analyst-style market sentiment summary with price changes.
-    </p>
+    <h2>Daily Market Summary</h2>
+    <p class="text-sm text-muted mb-4">Professional analyst-style market sentiment summary with price changes.</p>
 
-    <!-- Schedule Settings -->
-    <div class="mb-4" style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-        <h3 style="margin-top: 0; font-size: 1rem;">⏰ Automatic Daily Schedule</h3>
+    <div class="section-box mb-4">
+        <h3>Automatic Daily Schedule</h3>
         <form method="POST" action="/admin/settings/save-summary-schedule">
-            <table style="margin-bottom: 1rem;">
-                <tbody>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <label class="flex items-center gap-2" style="cursor: pointer;">
-                                <input type="checkbox" name="daily_summary_enabled" value="1"
-                                       {% if db_settings.get('daily_summary_enabled') == '1' %}checked{% endif %}
-                                       style="width: 18px; height: 18px;">
-                                <strong>Enable automatic daily summary</strong>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <span>Send at </span>
-                            <input type="time" name="daily_summary_time"
-                                   value="{{ db_settings.get('daily_summary_time', '18:00') }}"
-                                   class="form-input" style="width: 100px;">
-                            <span> Tehran time</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <span>Analyze news from last </span>
-                            <select name="daily_summary_hours" class="form-input" style="width: 100px;">
-                                {% set current_hours = db_settings.get('daily_summary_hours', '24') %}
-                                <option value="12" {% if current_hours == '12' %}selected{% endif %}>12 hours</option>
-                                <option value="24" {% if current_hours == '24' %}selected{% endif %}>24 hours</option>
-                                <option value="48" {% if current_hours == '48' %}selected{% endif %}>48 hours</option>
-                            </select>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <button type="submit" class="btn btn-primary">💾 Save Schedule Settings</button>
-        </form>
+            <div class="flex gap-4 items-center flex-wrap mb-4">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="daily_summary_enabled" value="1"
+                           {% if db_settings.get('daily_summary_enabled') == '1' %}checked{% endif %}>
+                    Enable automatic daily summary
+                </label>
+                <div class="flex gap-2 items-center">
+                    <span class="text-sm">Send at</span>
+                    <input type="time" name="daily_summary_time"
+                           value="{{ db_settings.get('daily_summary_time', '18:00') }}"
+                           class="form-input" style="width: 120px;">
+                    <span class="text-sm">Tehran</span>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <span class="text-sm">Analyze last</span>
+                    <select name="daily_summary_hours" class="form-input" style="width: 120px;">
+                        {% set current_hours = db_settings.get('daily_summary_hours', '24') %}
+                        <option value="12" {% if current_hours == '12' %}selected{% endif %}>12 hours</option>
+                        <option value="24" {% if current_hours == '24' %}selected{% endif %}>24 hours</option>
+                        <option value="48" {% if current_hours == '48' %}selected{% endif %}>48 hours</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm">Save Schedule</button>
 
-        <div style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; {% if db_settings.get('daily_summary_enabled') == '1' %}background: #d4edda; border: 1px solid #c3e6cb;{% else %}background: #f8f9fa; border: 1px solid #dee2e6;{% endif %}">
-            {% if db_settings.get('daily_summary_enabled') == '1' %}
-            <strong>✅ ENABLED</strong> — Summary will be sent daily at <strong>{{ db_settings.get('daily_summary_time', '18:00') }}</strong> Tehran time
-            {% else %}
-            <strong>⚪ DISABLED</strong> — Check the box above and click Save to enable
-            {% endif %}
-        </div>
+            <div class="mt-4">
+                {% if db_settings.get('daily_summary_enabled') == '1' %}
+                <span class="badge badge-success">ENABLED</span>
+                <span class="text-sm text-muted"> - Summary will be sent daily at {{ db_settings.get('daily_summary_time', '18:00') }} Tehran</span>
+                {% else %}
+                <span class="badge badge-gray">DISABLED</span>
+                {% endif %}
+            </div>
+        </form>
     </div>
 
-    <!-- Manual Send -->
-    <h3 style="font-size: 1rem;">📤 Send Now</h3>
+    <h3>Send Now</h3>
     <form method="POST" action="/admin/settings/send-daily-summary" class="flex gap-2 items-center">
-        <label class="text-sm" style="margin-bottom: 0;">Look back:</label>
         <select name="hours" class="form-input" style="width: 120px;">
             <option value="6">6 hours</option>
             <option value="12">12 hours</option>
             <option value="24" selected>24 hours</option>
             <option value="48">48 hours</option>
-            <option value="72">72 hours</option>
         </select>
-        <button type="submit" class="btn btn-primary">
-            Generate & Send Now
-        </button>
+        <button type="submit" class="btn btn-primary">Generate & Send</button>
     </form>
-
-    <div class="text-sm text-muted mt-4">
-        <strong>Summary includes:</strong>
-        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-            <li>Market overview from LLM analysis</li>
-            <li>Asset views with BULLISH/BEARISH sentiment and confidence</li>
-            <li>Key drivers and trading outlook for each asset</li>
-            <li>24h price changes</li>
-            <li>Top headlines</li>
-        </ul>
-    </div>
 </div>
 
 <div class="card">
-    <h2>📈 Market Sentiment Reports</h2>
-    <p class="text-sm text-muted mb-4">
-        Aggregated sentiment analysis for BTC, Gold, Oil, and DXY based on collected news.
-    </p>
+    <h2>Market Sentiment Reports</h2>
+    <p class="text-sm text-muted mb-4">Aggregated sentiment analysis for BTC, Gold, Oil, and DXY based on collected news.</p>
 
-    <!-- Sentiment Schedule Settings -->
-    <div class="mb-4" style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-        <h3 style="margin-top: 0; font-size: 1rem;">⏰ Automatic Sentiment Reports</h3>
+    <div class="section-box mb-4">
+        <h3>Automatic Sentiment Reports</h3>
         <form method="POST" action="/admin/settings/save-sentiment-schedule">
-            <table style="margin-bottom: 1rem;">
-                <tbody>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <label class="flex items-center gap-2" style="cursor: pointer;">
-                                <input type="checkbox" name="sentiment_1h_enabled" value="1"
-                                       {% if db_settings.get('sentiment_1h_enabled') == '1' %}checked{% endif %}
-                                       style="width: 18px; height: 18px;">
-                                <strong>1-Hour Sentiment</strong>
-                                <span class="text-sm text-muted">— Every hour at :00</span>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <label class="flex items-center gap-2" style="cursor: pointer;">
-                                <input type="checkbox" name="sentiment_4h_enabled" value="1"
-                                       {% if db_settings.get('sentiment_4h_enabled') == '1' %}checked{% endif %}
-                                       style="width: 18px; height: 18px;">
-                                <strong>4-Hour Sentiment</strong>
-                                <span class="text-sm text-muted">— At 00:00, 04:00, 08:00, 12:00, 16:00, 20:00</span>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 0.5rem 1rem 0.5rem 0;">
-                            <label class="flex items-center gap-2" style="cursor: pointer;">
-                                <input type="checkbox" name="sentiment_daily_enabled" value="1"
-                                       {% if db_settings.get('sentiment_daily_enabled') == '1' %}checked{% endif %}
-                                       style="width: 18px; height: 18px;">
-                                <strong>Daily Sentiment</strong>
-                            </label>
-                            <span style="margin-left: 26px;">
-                                at <input type="time" name="sentiment_daily_time"
-                                       value="{{ db_settings.get('sentiment_daily_time', '08:00') }}"
-                                       class="form-input" style="width: 100px;"> Tehran
-                            </span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <button type="submit" class="btn btn-primary">💾 Save Sentiment Schedule</button>
-        </form>
+            <div class="flex gap-4 flex-wrap mb-4">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="sentiment_1h_enabled" value="1"
+                           {% if db_settings.get('sentiment_1h_enabled') == '1' %}checked{% endif %}>
+                    <strong>1-Hour</strong>
+                    <span class="text-sm text-muted">Every hour at :00</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="sentiment_4h_enabled" value="1"
+                           {% if db_settings.get('sentiment_4h_enabled') == '1' %}checked{% endif %}>
+                    <strong>4-Hour</strong>
+                    <span class="text-sm text-muted">At 0, 4, 8, 12, 16, 20</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="sentiment_daily_enabled" value="1"
+                           {% if db_settings.get('sentiment_daily_enabled') == '1' %}checked{% endif %}>
+                    <strong>Daily</strong>
+                </label>
+                <div class="flex gap-2 items-center">
+                    <span class="text-sm">at</span>
+                    <input type="time" name="sentiment_daily_time"
+                           value="{{ db_settings.get('sentiment_daily_time', '08:00') }}"
+                           class="form-input" style="width: 120px;">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm">Save Sentiment Schedule</button>
 
-        <!-- Status Display -->
-        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            {% if db_settings.get('sentiment_1h_enabled') == '1' %}
-            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ 1H</span>
-            {% else %}
-            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ 1H</span>
-            {% endif %}
-            {% if db_settings.get('sentiment_4h_enabled') == '1' %}
-            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ 4H</span>
-            {% else %}
-            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ 4H</span>
-            {% endif %}
-            {% if db_settings.get('sentiment_daily_enabled') == '1' %}
-            <span style="padding: 0.25rem 0.5rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">✅ Daily @ {{ db_settings.get('sentiment_daily_time', '08:00') }}</span>
-            {% else %}
-            <span style="padding: 0.25rem 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem; color: #6c757d;">⚪ Daily</span>
-            {% endif %}
-        </div>
+            <div class="flex gap-2 mt-4 flex-wrap">
+                {% if db_settings.get('sentiment_1h_enabled') == '1' %}
+                <span class="badge badge-success">1H</span>
+                {% else %}
+                <span class="badge badge-gray">1H</span>
+                {% endif %}
+                {% if db_settings.get('sentiment_4h_enabled') == '1' %}
+                <span class="badge badge-success">4H</span>
+                {% else %}
+                <span class="badge badge-gray">4H</span>
+                {% endif %}
+                {% if db_settings.get('sentiment_daily_enabled') == '1' %}
+                <span class="badge badge-success">Daily @ {{ db_settings.get('sentiment_daily_time', '08:00') }}</span>
+                {% else %}
+                <span class="badge badge-gray">Daily</span>
+                {% endif %}
+            </div>
+        </form>
     </div>
 
-    <!-- Manual Send -->
-    <h3 style="font-size: 1rem;">📤 Send Sentiment Now</h3>
+    <h3>Send Sentiment Now</h3>
     <form method="POST" action="/admin/settings/send-sentiment" class="flex gap-2 items-center">
-        <label class="text-sm" style="margin-bottom: 0;">Period:</label>
         <select name="hours" class="form-input" style="width: 120px;">
             <option value="1">1 hour</option>
             <option value="4" selected>4 hours</option>
             <option value="24">24 hours</option>
         </select>
-        <button type="submit" class="btn btn-primary">
-            Generate & Send Now
-        </button>
+        <button type="submit" class="btn btn-primary">Generate & Send</button>
     </form>
-
-    <div class="text-sm text-muted mt-4">
-        <strong>Sentiment report includes:</strong>
-        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-            <li>Aggregated sentiment for <strong>BTC, Gold, Oil, DXY</strong></li>
-            <li>Bullish/Bearish/Neutral classification per asset</li>
-            <li>Sentiment strength indicator (Strong/Moderate/Weak)</li>
-            <li>Key news drivers for each asset</li>
-            <li>Visual sentiment bars</li>
-        </ul>
-    </div>
 </div>
 
 {% endblock %}

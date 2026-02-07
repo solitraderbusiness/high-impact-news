@@ -3,7 +3,7 @@
 {% block title %}Alerts - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>Sent Alerts</h1>
     <div class="flex gap-2 items-center">
         <span class="text-sm text-muted">Total: {{ total_count }} alerts</span>
@@ -18,7 +18,7 @@
 </div>
 
 {% if message %}
-<div class="alert alert-info mb-4">
+<div class="alert alert-info">
     {{ message }}
 </div>
 {% endif %}
@@ -28,11 +28,11 @@
         <thead>
             <tr>
                 <th>Event</th>
-                <th>Watch Item</th>
+                <th class="hide-mobile">Watch Item</th>
                 <th>Severity</th>
-                <th>Sent At</th>
+                <th class="hide-mobile">Sent At</th>
                 <th>Status</th>
-                <th>Retries</th>
+                <th class="hide-mobile">Retries</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -48,7 +48,7 @@
                     <span class="text-muted">Event deleted</span>
                     {% endif %}
                 </td>
-                <td>
+                <td class="hide-mobile">
                     {% if alert.detection and alert.detection.watch_item %}
                         <span class="badge badge-info">{{ alert.detection.watch_item.name }}</span>
                     {% else %}
@@ -68,7 +68,7 @@
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {{ alert.sent_at.strftime('%Y-%m-%d %H:%M:%S') }}
                 </td>
                 <td>
@@ -77,13 +77,13 @@
                     {% else %}
                         <span class="badge badge-danger">Failed</span>
                         {% if alert.error_message %}
-                        <div class="text-sm text-muted" style="color: #dc2626;">
+                        <div class="text-sm text-danger">
                             {{ alert.error_message[:50] }}{% if alert.error_message|length > 50 %}...{% endif %}
                         </div>
                         {% endif %}
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {{ alert.retry_count }}
                 </td>
                 <td>
@@ -110,11 +110,11 @@
     <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
 
     {% if page > 1 %}
-        <a href="?page=1&per_page={{ per_page }}">&laquo; First</a>
-        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo; Prev</a>
+        <a href="?page=1&per_page={{ per_page }}">&laquo;</a>
+        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo;</a>
     {% else %}
-        <span class="disabled">&laquo; First</span>
-        <span class="disabled">&lsaquo; Prev</span>
+        <span class="disabled">&laquo;</span>
+        <span class="disabled">&lsaquo;</span>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
@@ -128,16 +128,16 @@
     {% endfor %}
 
     {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">Next &rsaquo;</a>
-        <a href="?page={{ total_pages }}&per_page={{ per_page }}">Last &raquo;</a>
+        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">&rsaquo;</a>
+        <a href="?page={{ total_pages }}&per_page={{ per_page }}">&raquo;</a>
     {% else %}
-        <span class="disabled">Next &rsaquo;</span>
-        <span class="disabled">Last &raquo;</span>
+        <span class="disabled">&rsaquo;</span>
+        <span class="disabled">&raquo;</span>
     {% endif %}
 </div>
 {% endif %}
 
 <div class="text-sm text-muted text-center mt-2">
-    Showing {{ alerts|length }} of {{ total_count }} alerts. Alerts are sent via Telegram when events match watch items with severity >= {{ settings.alert_threshold }}.
+    Showing {{ alerts|length }} of {{ total_count }} alerts.
 </div>
 {% endblock %}

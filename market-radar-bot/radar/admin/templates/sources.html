@@ -3,7 +3,7 @@
 {% block title %}Sources - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>Sources</h1>
     <div class="flex gap-2 items-center">
         <span class="text-sm text-muted">Total: {{ total_count }} sources</span>
@@ -16,11 +16,11 @@
         <thead>
             <tr>
                 <th>Name</th>
-                <th>URL</th>
+                <th class="hide-mobile">URL</th>
                 <th>Type</th>
                 <th>Tier</th>
-                <th>Global</th>
-                <th>Last Fetched</th>
+                <th class="hide-mobile">Global</th>
+                <th class="hide-mobile">Last Fetched</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -33,7 +33,7 @@
                         <strong>{{ source.name }}</strong>
                     </a>
                 </td>
-                <td class="truncate text-sm">
+                <td class="truncate text-sm hide-mobile">
                     <a href="{{ source.url }}" target="_blank" class="text-muted">{{ source.url }}</a>
                 </td>
                 <td>
@@ -48,18 +48,18 @@
                         <span class="badge badge-gray">{{ source.tier.value }}</span>
                     {% endif %}
                 </td>
-                <td>
+                <td class="hide-mobile">
                     {% if source.is_global %}
-                        <span class="badge badge-info">Global</span>
+                        <span class="badge badge-primary">Global</span>
                     {% else %}
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {% if source.state and source.state.last_fetched_at %}
                         {{ source.state.last_fetched_at.strftime('%Y-%m-%d %H:%M') }}
                         {% if source.state.consecutive_errors > 0 %}
-                            <br><span class="text-muted" style="color: #dc2626;">{{ source.state.consecutive_errors }} errors</span>
+                            <br><span class="text-danger">{{ source.state.consecutive_errors }} errors</span>
                         {% endif %}
                     {% else %}
                         <span class="text-muted">Never</span>
@@ -98,11 +98,11 @@
     <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
 
     {% if page > 1 %}
-        <a href="?page=1&per_page={{ per_page }}">&laquo; First</a>
-        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo; Prev</a>
+        <a href="?page=1&per_page={{ per_page }}">&laquo;</a>
+        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo;</a>
     {% else %}
-        <span class="disabled">&laquo; First</span>
-        <span class="disabled">&lsaquo; Prev</span>
+        <span class="disabled">&laquo;</span>
+        <span class="disabled">&lsaquo;</span>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
@@ -116,11 +116,11 @@
     {% endfor %}
 
     {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">Next &rsaquo;</a>
-        <a href="?page={{ total_pages }}&per_page={{ per_page }}">Last &raquo;</a>
+        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">&rsaquo;</a>
+        <a href="?page={{ total_pages }}&per_page={{ per_page }}">&raquo;</a>
     {% else %}
-        <span class="disabled">Next &rsaquo;</span>
-        <span class="disabled">Last &raquo;</span>
+        <span class="disabled">&rsaquo;</span>
+        <span class="disabled">&raquo;</span>
     {% endif %}
 </div>
 {% endif %}

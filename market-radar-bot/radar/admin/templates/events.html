@@ -3,7 +3,7 @@
 {% block title %}Events - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>Recent Events</h1>
     <span class="text-sm text-muted">Total: {{ total_count }} events</span>
 </div>
@@ -19,11 +19,11 @@
         <thead>
             <tr>
                 <th>Title</th>
-                <th>Source</th>
-                <th>Published</th>
-                <th>Fetched</th>
+                <th class="hide-mobile">Source</th>
+                <th class="hide-mobile">Published</th>
+                <th class="hide-mobile">Fetched</th>
                 <th>Score</th>
-                <th>Detections</th>
+                <th class="hide-mobile">Detections</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -40,17 +40,17 @@
                     </div>
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {% if event.source %}
                         {{ event.source.name }}
                     {% else %}
                         <span class="text-muted">Unknown</span>
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {{ event.published_at|to_tehran }}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {{ event.fetched_at|to_tehran }}
                 </td>
                 <td class="text-sm">
@@ -63,13 +63,13 @@
                         {% elif max_score >= 50 %}
                             <span class="badge badge-info">{{ max_score }}</span>
                         {% else %}
-                            <span class="badge">{{ max_score }}</span>
+                            <span class="badge badge-gray">{{ max_score }}</span>
                         {% endif %}
                     {% else %}
                         <span class="text-muted">-</span>
                     {% endif %}
                 </td>
-                <td class="text-sm">
+                <td class="text-sm hide-mobile">
                     {% if event.detections %}
                         {{ event.detections|length }}
                     {% else %}
@@ -80,7 +80,7 @@
                     {% if event.detections %}
                         <form method="POST" action="/admin/events/{{ event.id }}/test-send" style="display: inline;">
                             <button type="submit" class="btn btn-secondary btn-sm" title="Send test alert to Telegram">
-                                📤 Test
+                                Test
                             </button>
                         </form>
                     {% else %}
@@ -104,11 +104,11 @@
     <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
 
     {% if page > 1 %}
-        <a href="?page=1&per_page={{ per_page }}">&laquo; First</a>
-        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo; Prev</a>
+        <a href="?page=1&per_page={{ per_page }}">&laquo;</a>
+        <a href="?page={{ page - 1 }}&per_page={{ per_page }}">&lsaquo;</a>
     {% else %}
-        <span class="disabled">&laquo; First</span>
-        <span class="disabled">&lsaquo; Prev</span>
+        <span class="disabled">&laquo;</span>
+        <span class="disabled">&lsaquo;</span>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
@@ -122,16 +122,16 @@
     {% endfor %}
 
     {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">Next &rsaquo;</a>
-        <a href="?page={{ total_pages }}&per_page={{ per_page }}">Last &raquo;</a>
+        <a href="?page={{ page + 1 }}&per_page={{ per_page }}">&rsaquo;</a>
+        <a href="?page={{ total_pages }}&per_page={{ per_page }}">&raquo;</a>
     {% else %}
-        <span class="disabled">Next &rsaquo;</span>
-        <span class="disabled">Last &raquo;</span>
+        <span class="disabled">&rsaquo;</span>
+        <span class="disabled">&raquo;</span>
     {% endif %}
 </div>
 {% endif %}
 
 <div class="text-sm text-muted text-center mt-2">
-    Showing {{ events|length }} of {{ total_count }} events. Events are collected from active sources and matched against watch items.
+    Showing {{ events|length }} of {{ total_count }} events.
 </div>
 {% endblock %}

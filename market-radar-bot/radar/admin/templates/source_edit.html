@@ -3,97 +3,105 @@
 {% block title %}{% if is_new %}New{% else %}Edit{% endif %} Source - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>{% if is_new %}New Source{% else %}Edit: {{ source.name }}{% endif %}</h1>
     <a href="/admin/sources" class="btn btn-secondary">Back to List</a>
 </div>
 
 <div class="card">
     <form method="POST" action="{% if is_new %}/admin/sources/new{% else %}/admin/sources/{{ source.id }}{% endif %}">
-        <div class="form-group">
-            <label for="name">Name *</label>
-            <input type="text" id="name" name="name" required
-                   value="{{ source.name if source else '' }}"
-                   placeholder="e.g., Reuters Top News, Fed Press Releases">
+        <div class="grid-2">
+            <div class="form-group">
+                <label for="name">Name *</label>
+                <input type="text" id="name" name="name" required
+                       value="{{ source.name if source else '' }}"
+                       placeholder="e.g., Reuters Top News, Fed Press Releases">
+            </div>
+
+            <div class="form-group">
+                <label for="url">URL *</label>
+                <input type="text" id="url" name="url" required
+                       value="{{ source.url if source else '' }}"
+                       placeholder="https://example.com/rss/feed.xml or @channelname">
+                <div class="help-text">For Telegram: use @channelname or https://t.me/channelname</div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="url">URL *</label>
-            <input type="text" id="url" name="url" required
-                   value="{{ source.url if source else '' }}"
-                   placeholder="https://example.com/rss/feed.xml or @channelname">
-            <div class="help-text">For Telegram: use @channelname or https://t.me/channelname</div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label for="source_type">Type *</label>
+                <select id="source_type" name="source_type" required>
+                    {% for st in source_types %}
+                    <option value="{{ st.value }}"
+                            {% if source and source.source_type == st %}selected{% endif %}>
+                        {{ st.value|upper }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="help-text">RSS for feeds, WEB for scraping HTML pages, TELEGRAM for Telegram channels</div>
+            </div>
+
+            <div class="form-group">
+                <label for="tier">Tier *</label>
+                <select id="tier" name="tier" required>
+                    {% for t in source_tiers %}
+                    <option value="{{ t.value }}"
+                            {% if source and source.tier == t %}selected{% endif %}>
+                        {{ t.value|title }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="help-text">
+                    Primary: Official sources, wire services (higher severity bonus)<br>
+                    Secondary: Major news outlets<br>
+                    Social: Social media, blogs (no bonus)
+                </div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="source_type">Type *</label>
-            <select id="source_type" name="source_type" required>
-                {% for st in source_types %}
-                <option value="{{ st.value }}"
-                        {% if source and source.source_type == st %}selected{% endif %}>
-                    {{ st.value|upper }}
-                </option>
-                {% endfor %}
-            </select>
-            <div class="help-text">RSS for feeds, WEB for scraping HTML pages, TELEGRAM for Telegram channels</div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_global" value="true"
+                           {% if source and source.is_global %}checked{% endif %}>
+                    Global Source
+                </label>
+                <div class="help-text">Global sources are scanned for all watch items, not just linked ones</div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_active" value="true"
+                           {% if not source or source.is_active %}checked{% endif %}>
+                    Active
+                </label>
+                <div class="help-text">Only active sources are polled</div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="tier">Tier *</label>
-            <select id="tier" name="tier" required>
-                {% for t in source_tiers %}
-                <option value="{{ t.value }}"
-                        {% if source and source.tier == t %}selected{% endif %}>
-                    {{ t.value|title }}
-                </option>
-                {% endfor %}
-            </select>
-            <div class="help-text">
-                Primary: Official sources, wire services (higher severity bonus)<br>
-                Secondary: Major news outlets<br>
-                Social: Social media, blogs (no bonus)
+        <div class="grid-2">
+            <div class="form-group">
+                <label for="poll_interval_override">Poll Interval Override (seconds)</label>
+                <input type="number" id="poll_interval_override" name="poll_interval_override" min="10"
+                       value="{{ source.poll_interval_override if source and source.poll_interval_override else '' }}"
+                       placeholder="Leave empty to use default">
+                <div class="help-text">Custom poll interval for this source (overrides global setting)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="content_selector">Content Selector (for WEB type)</label>
+                <input type="text" id="content_selector" name="content_selector"
+                       value="{{ source.content_selector if source and source.content_selector else '' }}"
+                       placeholder="e.g., article.main-content, #article-body">
+                <div class="help-text">CSS selector to extract main content from web pages</div>
             </div>
         </div>
 
         <div class="form-group">
-            <label class="checkbox-label">
-                <input type="checkbox" name="is_global" value="true"
-                       {% if source and source.is_global %}checked{% endif %}>
-                Global Source
-            </label>
-            <div class="help-text">Global sources are scanned for all watch items, not just linked ones</div>
-        </div>
-
-        <div class="form-group">
-            <label class="checkbox-label">
-                <input type="checkbox" name="is_active" value="true"
-                       {% if not source or source.is_active %}checked{% endif %}>
-                Active
-            </label>
-            <div class="help-text">Only active sources are polled</div>
-        </div>
-
-        <div class="form-group">
-            <label for="poll_interval_override">Poll Interval Override (seconds)</label>
-            <input type="number" id="poll_interval_override" name="poll_interval_override" min="10"
-                   value="{{ source.poll_interval_override if source and source.poll_interval_override else '' }}"
-                   placeholder="Leave empty to use default">
-            <div class="help-text">Custom poll interval for this source (overrides global setting)</div>
-        </div>
-
-        <div class="form-group">
-            <label for="content_selector">Content Selector (for WEB type)</label>
-            <input type="text" id="content_selector" name="content_selector"
-                   value="{{ source.content_selector if source and source.content_selector else '' }}"
-                   placeholder="e.g., article.main-content, #article-body">
-            <div class="help-text">CSS selector to extract main content from web pages</div>
-        </div>
-
-        <div class="form-group">
             <label>Linked Watch Items</label>
-            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem;">
+            <div class="section-box" style="max-height: 200px; overflow-y: auto;">
                 {% for wi in watch_items %}
-                <label class="checkbox-label" style="margin-bottom: 0.25rem;">
+                <label class="checkbox-label" style="margin-bottom: 0.5rem;">
                     <input type="checkbox" name="watch_item_id" value="{{ wi.id }}"
                            {% if source_watch_item_ids is defined and wi.id in source_watch_item_ids %}checked{% endif %}>
                     {{ wi.name }} <span class="text-muted">({{ wi.category.value }})</span>
@@ -107,15 +115,19 @@
         </div>
 
         {% if source and source.state %}
-        <div class="card" style="background: #f9fafb; margin-top: 1rem;">
-            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Source State</h3>
-            <div class="text-sm">
-                <p><strong>Last Fetched:</strong> {{ source.state.last_fetched_at.strftime('%Y-%m-%d %H:%M:%S UTC') if source.state.last_fetched_at else 'Never' }}</p>
-                <p><strong>Last Item Published:</strong> {{ source.state.last_item_published_at.strftime('%Y-%m-%d %H:%M:%S UTC') if source.state.last_item_published_at else 'N/A' }}</p>
-                <p><strong>Consecutive Errors:</strong> {{ source.state.consecutive_errors }}</p>
-                {% if source.state.last_error %}
-                <p><strong>Last Error:</strong> <span style="color: #dc2626;">{{ source.state.last_error }}</span></p>
-                {% endif %}
+        <div class="section-box mt-4">
+            <h3>Source State</h3>
+            <div class="text-sm grid-2">
+                <div>
+                    <p><strong>Last Fetched:</strong> {{ source.state.last_fetched_at.strftime('%Y-%m-%d %H:%M:%S UTC') if source.state.last_fetched_at else 'Never' }}</p>
+                    <p><strong>Last Item Published:</strong> {{ source.state.last_item_published_at.strftime('%Y-%m-%d %H:%M:%S UTC') if source.state.last_item_published_at else 'N/A' }}</p>
+                </div>
+                <div>
+                    <p><strong>Consecutive Errors:</strong> {{ source.state.consecutive_errors }}</p>
+                    {% if source.state.last_error %}
+                    <p><strong>Last Error:</strong> <span class="text-danger">{{ source.state.last_error }}</span></p>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endif %}

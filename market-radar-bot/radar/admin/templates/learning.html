@@ -3,7 +3,7 @@
 {% block title %}Learning System - Market Radar Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
+<div class="page-header">
     <h1>Learning System</h1>
     <div class="flex gap-2">
         <form action="/admin/learning/discover" method="post" style="display: inline;">
@@ -18,7 +18,7 @@
 
 {% if request.query_params.get('message') %}
 <div class="alert alert-success">
-    {{ request.query_params.get('message') }}
+    {{ request.query_params.get('message').replace('+', ' ') }}
 </div>
 {% endif %}
 
@@ -106,7 +106,7 @@
                 <td>
                     <a href="/admin/learning/history/{{ h.watch_item_id if h.watch_item_id else '' }}">{{ h.watch_item_name }}</a>
                 </td>
-                <td class="truncate">{{ h.event_title or 'N/A' }}</td>
+                <td class="truncate" style="max-width: 250px;">{{ h.event_title or 'N/A' }}</td>
                 <td>
                     {% if h.severity_score >= 70 %}
                     <span class="badge badge-danger">{{ h.severity_score }}</span>
@@ -127,11 +127,11 @@
                 </td>
                 <td>
                     {% if h.impact_direction == 'up' %}
-                    <span style="color: green;">&#9650; Up</span>
+                    <span class="text-success">&#9650; Up</span>
                     {% elif h.impact_direction == 'down' %}
-                    <span style="color: red;">&#9660; Down</span>
+                    <span class="text-danger">&#9660; Down</span>
                     {% elif h.impact_direction == 'mixed' %}
-                    <span style="color: gray;">&#9644; Mixed</span>
+                    <span class="text-muted">&#9644; Mixed</span>
                     {% else %}
                     <span class="text-muted">-</span>
                     {% endif %}
@@ -159,20 +159,20 @@
                 <th>Type</th>
                 <th>Suggested Tier</th>
                 <th>Discovered Via</th>
-                <th>Sample Content</th>
+                <th class="hide-mobile">Sample Content</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for c in candidates %}
             <tr>
-                <td class="truncate">
+                <td class="truncate" style="max-width: 200px;">
                     <a href="{{ c.url }}" target="_blank">{{ c.url }}</a>
                 </td>
-                <td>{{ c.source_type }}</td>
-                <td>{{ c.suggested_tier }}</td>
-                <td>{{ c.discovered_via }}</td>
-                <td class="text-sm">
+                <td><span class="badge badge-info">{{ c.source_type }}</span></td>
+                <td><span class="badge badge-gray">T{{ c.suggested_tier }}</span></td>
+                <td class="text-sm">{{ c.discovered_via }}</td>
+                <td class="text-sm hide-mobile">
                     {% if c.validation_results and c.validation_results.sample_items %}
                     {{ c.validation_results.sample_items[0][:50] }}...
                     {% else %}
@@ -180,9 +180,9 @@
                     {% endif %}
                 </td>
                 <td>
-                    <form action="/admin/learning/promote/{{ c.id }}" method="post" style="display: inline-flex; gap: 0.25rem;">
-                        <input type="text" name="name" placeholder="Source name" required style="width: 120px; padding: 0.25rem;">
-                        <select name="tier" style="width: 60px; padding: 0.25rem;">
+                    <form action="/admin/learning/promote/{{ c.id }}" method="post" class="flex gap-2">
+                        <input type="text" name="name" placeholder="Name" required class="form-input" style="width: 100px;">
+                        <select name="tier" class="form-input" style="width: 60px;">
                             <option value="1">T1</option>
                             <option value="2">T2</option>
                             <option value="3" selected>T3</option>
