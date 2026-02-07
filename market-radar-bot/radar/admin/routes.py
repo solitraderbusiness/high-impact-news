@@ -918,10 +918,22 @@ async def deploy_updates(request: Request):
             break
 
     if not deploy_script:
-        # List where we looked
-        paths_checked = ", ".join([p.split("/")[-1] for p in possible_paths[:3]])
+        # Check why each path failed
+        issues = []
+        for path in possible_paths[:3]:
+            if os.path.isfile(path):
+                if not os.access(path, os.X_OK):
+                    issues.append(f"{path}+exists+but+not+executable")
+            else:
+                issues.append(f"{path}+not+found")
+
+        if issues:
+            msg = issues[0]  # Show first issue
+        else:
+            msg = "No+deploy.sh+found.+Expected+at+/home/radarbot/deploy.sh"
+
         return RedirectResponse(
-            url=f"/admin/settings?message=Deploy+script+not+found.+Expected+at:{str(project_root / 'deploy.sh').replace(' ', '+')}",
+            url=f"/admin/settings?message={msg}",
             status_code=302
         )
 
